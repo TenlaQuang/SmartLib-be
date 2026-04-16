@@ -54,6 +54,7 @@ class Book(Base):
     deposit_required = Column(Numeric(12, 2), nullable=True)
     
     status = Column(String(20), default="available")
+    image_url = Column(String(500), nullable=True)
 
     # Mối quan hệ
     category = relationship("Category", back_populates="books")

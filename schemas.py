@@ -27,11 +27,25 @@ class Category(CategoryBase):
 class BookBase(BaseModel):
     isbn: str
     title: str
-    status: str
+    status: Optional[str] = "available"
     market_price: Decimal
-    rental_rate_percent: Decimal
-    fine_rate_percent: Decimal
+    rental_rate_percent: Optional[Decimal] = Decimal("1.0")
+    fine_rate_percent: Optional[Decimal] = Decimal("2.0")
     deposit_required: Optional[Decimal] = None
+    image_url: Optional[str] = None
+
+class BookCreate(BookBase):
+    pass
+
+class BookUpdate(BaseModel):
+    isbn: Optional[str] = None
+    title: Optional[str] = None
+    status: Optional[str] = None
+    market_price: Optional[Decimal] = None
+    rental_rate_percent: Optional[Decimal] = None
+    fine_rate_percent: Optional[Decimal] = None
+    deposit_required: Optional[Decimal] = None
+    image_url: Optional[str] = None
 
 class BookResponse(BookBase):
     book_id: int
