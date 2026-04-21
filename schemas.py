@@ -14,6 +14,9 @@ class Location(LocationBase):
     class Config:
         from_attributes = True
 
+class LocationCreate(LocationBase):
+    pass
+
 # --- Category Schemas ---
 class CategoryBase(BaseModel):
     name: str
@@ -33,6 +36,8 @@ class BookBase(BaseModel):
     fine_rate_percent: Optional[Decimal] = Decimal("2.0")
     deposit_required: Optional[Decimal] = None
     image_url: Optional[str] = None
+    category_id: Optional[int] = None
+    location_id: Optional[int] = None
 
 class BookCreate(BookBase):
     pass
@@ -46,6 +51,8 @@ class BookUpdate(BaseModel):
     fine_rate_percent: Optional[Decimal] = None
     deposit_required: Optional[Decimal] = None
     image_url: Optional[str] = None
+    category_id: Optional[int] = None
+    location_id: Optional[int] = None
 
 class BookResponse(BookBase):
     book_id: int
