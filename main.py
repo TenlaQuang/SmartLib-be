@@ -7,6 +7,8 @@ from typing import List
 import os
 import shutil
 import uuid
+import cloudinary
+import cloudinary.uploader
 
 # Import Database và Models/Schemas
 from database import engine, get_db, Base
@@ -16,6 +18,14 @@ import schemas
 # (Tùy chọn) Tự động tạo bảng nếu chưa có, nhưng vì bạn đã chạy SQL trên NeonDB nên ta có thể bỏ qua dòng này. 
 # Tuy nhiên, để cho an toàn thì cứ để, nếu bảng có rồi nó sẽ không làm gì.
 # models.Base.metadata.create_all(bind=engine)
+
+# Cấu hình Cloudinary
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 app = FastAPI(title="SmartLib API")
 
@@ -69,21 +79,18 @@ def get_book_by_id(book_id: int, db: Session = Depends(get_db)):
 @app.post("/api/upload-image")
 async def upload_image(file: UploadFile = File(...)):
     """
-    API upload ảnh bìa.
-    Khuyến cáo ở production nên dùng dịch vụ đám mây (S3/Cloudinary), 
-    nhưng ở đây hướng dẫn lưu cục bộ vào folder /static/images/
+    API upload ảnh bìa trực tiếp lên Cloudinary.
     """
     try:
-        # Đặt lại tên file ngẫu nhiên tránh trùng lặp
-        file_ext = os.path.splitext(file.filename)[1]
-        new_filename = f"{uuid.uuid4().hex}{file_ext}"
-        file_path = f"static/images/{new_filename}"
+        # Đọc nội dung file
+        file_contents = await file.read()
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        # Trả về URL đường dẫn tĩnh để Backend host file
-        image_url = f"/static/images/{new_filename}"
+        # Upload lên Cloudinary
+        result = cloudinary.uploader.upload(file_contents, folder="smartlib_books")
+        
+        # Lấy URL của ảnh trên Cloudinary
+        image_url = result.get("secure_url")
+        
         return {"image_url": image_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Không thể upload ảnh: {str(e)}")
