@@ -172,6 +172,9 @@ import shutil
 import uuid
 import cloudinary
 import cloudinary.uploader
+import pandas as pd
+import io
+import random
 
 # Import Database và Models/Schemas
 from database import engine, get_db, Base
@@ -258,11 +261,76 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Không thể upload ảnh: {str(e)}")
 
+@app.post("/api/books/import-excel")
+async def import_books_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Nhập sách hàng loạt từ file Excel.
+    Cột yêu cầu: title, market_price
+    Cột tùy chọn: quantity (mặc định 1)
+    """
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+        
+        required_cols = ['title', 'market_price']
+        for col in required_cols:
+            if col not in df.columns:
+                raise HTTPException(status_code=400, detail=f"File Excel thiếu cột bắt buộc: {col}")
+                
+        books_created = 0
+        
+        for index, row in df.iterrows():
+            if pd.isna(row['title']):
+                continue
+            title = str(row['title'])
+            market_price = float(row['market_price']) if not pd.isna(row['market_price']) else 0.0
+            quantity = int(row['quantity']) if 'quantity' in df.columns and not pd.isna(row['quantity']) else 1
+            
+            for _ in range(quantity):
+                while True:
+                    prefix = "978"
+                    d1 = str(random.randint(0, 9))
+                    d2 = str(random.randint(0, 9999)).zfill(4)
+                    d3 = str(random.randint(0, 9999)).zfill(4)
+                    partial = prefix + d1 + d2 + d3
+                    sum_digits = sum(int(digit) if i % 2 == 0 else int(digit) * 3 for i, digit in enumerate(partial))
+                    remainder = sum_digits % 10
+                    check_digit = 0 if remainder == 0 else 10 - remainder
+                    isbn = f"{prefix}-{d1}-{d2}-{d3}-{check_digit}"
+                    
+                    existing = db.query(models.Book).filter(models.Book.isbn == isbn).first()
+                    if not existing:
+                        break
+                        
+                new_book = models.Book(
+                    isbn=isbn,
+                    title=title,
+                    market_price=market_price,
+                    status="available"
+                )
+                db.add(new_book)
+                books_created += 1
+                
+        db.commit()
+        return {"message": f"Nhập thành công {books_created} cuốn sách."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/books", response_model=schemas.BookResponse)
 def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
     """
     API thêm mới một cuốn sách.
     """
+    if book_in.location_id is not None:
+        existing_location_book = db.query(models.Book).filter(
+            models.Book.title == book_in.title,
+            models.Book.location_id != None,
+            models.Book.location_id != book_in.location_id
+        ).first()
+        if existing_location_book:
+            raise HTTPException(status_code=400, detail=f"Sách '{book_in.title}' đã được xếp ở vị trí khác. Một tựa sách chỉ ở duy nhất 1 vị trí.")
+            
     new_book = models.Book(**book_in.model_dump())
     db.add(new_book)
     try:
@@ -282,6 +350,17 @@ def update_book(book_id: int, book_in: schemas.BookUpdate, db: Session = Depends
     if not book:
         raise HTTPException(status_code=404, detail="Không tìm thấy cuốn sách này")
     
+    target_title = book_in.title if book_in.title else book.title
+    if 'location_id' in book_in.model_dump(exclude_unset=True) and book_in.location_id is not None:
+        existing_location_book = db.query(models.Book).filter(
+            models.Book.title == target_title,
+            models.Book.book_id != book_id,
+            models.Book.location_id != None,
+            models.Book.location_id != book_in.location_id
+        ).first()
+        if existing_location_book:
+            raise HTTPException(status_code=400, detail=f"Sách '{target_title}' đã được xếp ở vị trí khác. Một tựa sách chỉ ở duy nhất 1 vị trí.")
+            
     update_data = book_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(book, key, value)
