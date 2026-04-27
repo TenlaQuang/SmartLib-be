@@ -61,3 +61,22 @@ class BookResponse(BookBase):
 
     class Config:
         from_attributes = True
+
+# --- Registration Schemas ---
+class RegistrationRequestCreate(BaseModel):
+    user_code: str
+    full_name: str
+    gender: Optional[str] = None
+    birth_year: Optional[int] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+
+class RegistrationRequestResponse(BaseModel):
+    request_id: int
+    user_code: str
+    full_name: str
+    request_status: str
+
+    class Config:
+        from_attributes = True

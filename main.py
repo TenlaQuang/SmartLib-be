@@ -375,3 +375,23 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/register", response_model=schemas.RegistrationRequestResponse)
+def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depends(get_db)):
+    """
+    API tạo yêu cầu đăng ký người dùng mới.
+    """
+    # Check if user_code already exists in registration_requests
+    existing_req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.user_code == req_in.user_code).first()
+    if existing_req:
+        raise HTTPException(status_code=400, detail="Mã sinh viên/CCCD này đã có yêu cầu đăng ký.")
+        
+    new_request = models.RegistrationRequest(**req_in.model_dump())
+    db.add(new_request)
+    try:
+        db.commit()
+        db.refresh(new_request)
+        return new_request
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
