@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Numeric, DateTime, Float
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Numeric, DateTime, Float, BigInteger
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -73,5 +73,7 @@ class RegistrationRequest(Base):
     address = Column(Text, nullable=True)
     email = Column(String(100), nullable=True)
     request_status = Column(String(20), default="pending")
+    payment_status = Column(String(20), default="pending")
+    payos_order_code = Column(BigInteger, unique=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

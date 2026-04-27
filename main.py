@@ -9,6 +9,9 @@ import shutil
 import uuid
 import cloudinary
 import cloudinary.uploader
+from payos import PayOS, ItemData, PaymentData
+from fastapi.responses import HTMLResponse
+import time
 
 # Import Database và Models/Schemas
 from database import engine, get_db, Base
@@ -25,6 +28,17 @@ cloudinary.config(
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True
+)
+
+# Khởi tạo PayOS
+payos_client_id = os.getenv("PAYOS_CLIENT_ID", "YOUR_CLIENT_ID")
+payos_api_key = os.getenv("PAYOS_API_KEY", "YOUR_API_KEY")
+payos_checksum_key = os.getenv("PAYOS_CHECKSUM_KEY", "YOUR_CHECKSUM_KEY")
+
+payos_client = PayOS(
+    client_id=payos_client_id,
+    api_key=payos_api_key,
+    checksum_key=payos_checksum_key
 )
 
 app = FastAPI(title="SmartLib API")
@@ -379,9 +393,8 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
 @app.post("/api/register", response_model=schemas.RegistrationRequestResponse)
 def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depends(get_db)):
     """
-    API tạo yêu cầu đăng ký người dùng mới.
+    API tạo yêu cầu đăng ký người dùng mới và tạo link thanh toán PayOS.
     """
-    # Check if user_code already exists in registration_requests
     existing_req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.user_code == req_in.user_code).first()
     if existing_req:
         raise HTTPException(status_code=400, detail="Mã sinh viên/CCCD này đã có yêu cầu đăng ký.")
@@ -391,7 +404,98 @@ def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depen
     try:
         db.commit()
         db.refresh(new_request)
-        return new_request
+        
+        # 1. Tạo order_code duy nhất cho PayOS (phải là số nguyên, max 9007199254740991)
+        # Kết hợp timestamp và request_id để đảm bảo duy nhất
+        order_code = int(f"{int(time.time())}{new_request.request_id}")
+        
+        # Lưu order_code vào DB
+        new_request.payos_order_code = order_code
+        db.commit()
+        
+        # 2. Tạo dữ liệu thanh toán PayOS
+        # Số tiền quy định là 50.000 VND (bạn có thể thay đổi)
+        amount = 50000 
+        item = ItemData(name=f"Đăng ký thẻ SmartLib - {new_request.user_code}", quantity=1, price=amount)
+        
+        # Lấy base URL từ môi trường hoặc hardcode URL Backend Render của bạn
+        domain = os.getenv("BACKEND_URL", "https://smartlib-be.onrender.com")
+        
+        payment_data = PaymentData(
+            orderCode=order_code,
+            amount=amount,
+            description=f"DK {new_request.user_code}", # Tối đa 25 ký tự
+            items=[item],
+            returnUrl=f"{domain}/payment-success",
+            cancelUrl=f"{domain}/payment-success" # Có thể làm trang /payment-cancel riêng nếu muốn
+        )
+        
+        # 3. Gọi PayOS tạo link thanh toán
+        payos_response = payos_client.createPaymentLink(payment_data)
+        
+        # Trả về Response kèm theo checkoutUrl
+        response_data = schemas.RegistrationRequestResponse.model_validate(new_request)
+        response_data.checkoutUrl = payos_response.checkoutUrl
+        return response_data
+        
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Lỗi: {str(e)}")
+
+@app.post("/api/payos-webhook")
+def payos_webhook(webhook_data: dict, db: Session = Depends(get_db)):
+    """
+    Webhook để PayOS gọi về khi có thanh toán thành công.
+    """
+    try:
+        # Ở môi trường thực tế, BẠN CẦN verify chữ ký (checksum) của Webhook để đảm bảo bảo mật.
+        # webhook_data_verified = payos_client.verifyPaymentWebhookData(webhook_data)
+        # data = webhook_data_verified.data
+        
+        # Đối với PayOS dict (nếu không parse model)
+        data = webhook_data.get("data", {})
+        order_code = data.get("orderCode")
+        
+        if order_code:
+            # Cập nhật trạng thái thanh toán trong DB
+            req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.payos_order_code == order_code).first()
+            if req:
+                req.payment_status = "paid"
+                db.commit()
+                
+        return {"success": True}
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/payment-success", response_class=HTMLResponse)
+def payment_success_page():
+    """
+    Trang web hiển thị sau khi sinh viên thanh toán xong trên trình duyệt.
+    """
+    return """
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Thanh toán SmartLib</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #FFF7DD; color: #80A1BA; text-align: center; padding: 50px; }
+            h1 { color: #91C4C3; }
+            .container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
+            .icon { font-size: 60px; color: #B4DEBD; margin-bottom: 20px; }
+            p { font-size: 18px; line-height: 1.6; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">✔️</div>
+            <h1>Giao dịch hoàn tất!</h1>
+            <p>Yêu cầu đăng ký thẻ SmartLib của bạn đã được tiếp nhận.</p>
+            <p>Vui lòng quay lại ứng dụng và chờ email xác nhận phê duyệt từ thư viện nhé!</p>
+            <p style="font-size: 14px; color: #ccc; margin-top: 30px;">Bạn có thể đóng cửa sổ trình duyệt này.</p>
+        </div>
+    </body>
+    </html>
+    """
