@@ -53,14 +53,21 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
-    expose_headers=["*"],
-)
+@app.middleware("http")
+async def add_cors_header(request, call_next):
+    # Xử lý các request OPTIONS (Preflight)
+    if request.method == "OPTIONS":
+        response = HTMLResponse(content="", status_code=204)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+    
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # ==============================================================================
 # Utility helpers
