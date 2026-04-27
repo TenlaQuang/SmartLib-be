@@ -93,3 +93,12 @@ class User(Base):
     user_type = Column(String(20), default="student")
     status = Column(String(20), default="pending_nfc")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class NfcTag(Base):
+    __tablename__ = "nfc_inventory"
+
+    tag_id = Column(Integer, primary_key=True, index=True)
+    nfc_serial = Column(String(100), unique=True, index=True, nullable=False)
+    label = Column(String(100), nullable=False)
+    status = Column(String(20), default="available") # available | assigned
+    created_at = Column(DateTime, default=datetime.utcnow)

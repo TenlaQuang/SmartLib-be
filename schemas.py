@@ -125,3 +125,20 @@ class RegistrationReject(BaseModel):
 class NFCReissue(BaseModel):
     new_nfc_serial: str
 
+
+
+class NfcTagCreate(BaseModel):
+    nfc_serial: str
+    label: str
+
+class NfcTagResponse(BaseModel):
+    tag_id: int
+    nfc_serial: str
+    label: str
+    status: str
+    
+    class Config:
+        from_attributes = True
+
+class RegistrationApproveWithTag(BaseModel):
+    tag_id: int
