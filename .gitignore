@@ -12,8 +12,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Database and SQL
+# Database and SQL dump files
 *.sql
+sqla
+smartLib-v2
 sql-smartlib.txt
 *.sqlite3
 

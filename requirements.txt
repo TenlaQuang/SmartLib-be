@@ -1,10 +1,21 @@
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-python-dotenv
-python-multipart
-cloudinary
+# Web framework
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
 
-pandas
-openpyxl
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# Config & Forms
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+
+# Image upload
+cloudinary>=1.40.0
+
+# Payment
+payos>=1.1.0
+
+# Excel import
+pandas>=2.0.0
+openpyxl>=3.1.0

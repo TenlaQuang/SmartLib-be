@@ -1,62 +1,91 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from typing import List
+# ==============================================================================
+# SmartLib API - FastAPI Backend
+# ==============================================================================
 import os
-import shutil
-import uuid
+import io
+import time
+import random
+import smtplib
+from typing import List
+from email.mime.text import MIMEText
+
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-import io
-import random
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from payos import PayOS
+from payos.types import CreatePaymentLinkRequest, ItemData
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-# Import Database và Models/Schemas
-from database import engine, get_db, Base
+from database import get_db
 import models
 import schemas
 
-# (Tùy chọn) Tự động tạo bảng nếu chưa có, nhưng vì bạn đã chạy SQL trên NeonDB nên ta có thể bỏ qua dòng này. 
-# Tuy nhiên, để cho an toàn thì cứ để, nếu bảng có rồi nó sẽ không làm gì.
-# models.Base.metadata.create_all(bind=engine)
-
-# Cấu hình Cloudinary
+# ==============================================================================
+# Cau hinh dich vu ben ngoai
+# ==============================================================================
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
-    secure=True
+    secure=True,
 )
 
-app = FastAPI(title="SmartLib API")
+payos_client = PayOS(
+    client_id=os.getenv("PAYOS_CLIENT_ID", ""),
+    api_key=os.getenv("PAYOS_API_KEY", ""),
+    checksum_key=os.getenv("PAYOS_CHECKSUM_KEY", ""),
+)
 
-# Cấu hình chứa file tĩnh (Hình ảnh)
-os.makedirs("static/images", exist_ok=True)
+BACKEND_URL = os.getenv("BACKEND_URL", "https://smartlib-be.onrender.com")
+CARD_FEE = int(os.getenv("CARD_FEE", "10000"))  # Phi lam the (VND)
+
+# ==============================================================================
+# Khoi tao ung dung
+# ==============================================================================
+app = FastAPI(title="SmartLib API", version="2.0.0")
+
+# Tao thu muc static neu chua co (can thiet tren Render)
+static_dir = "static/images"
+os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Setup CORS for flutter web / local testing
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
+@app.middleware("http")
+async def add_cors_header(request, call_next):
+    # Xu ly cac request OPTIONS (Preflight)
+    if request.method == "OPTIONS":
+        response = HTMLResponse(content="", status_code=204)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
 
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
+# ==============================================================================
+# Email Helper
+# ==============================================================================
 def send_email_notification(to_email: str, subject: str, body: str):
+    """
+    Gui email thong bao den sinh vien khi duyet hoac tu choi don dang ky.
+    Can cau hinh SMTP_EMAIL va SMTP_PASSWORD trong .env / Render Environment.
+    """
     sender_email = os.getenv("SMTP_EMAIL")
     sender_password = os.getenv("SMTP_PASSWORD")
     if not sender_email or not sender_password:
-        print(f"Cảnh báo: Chưa cấu hình SMTP_EMAIL và SMTP_PASSWORD trong .env. Bỏ qua gửi email tới {to_email}.")
-        print(f"Nội dung thư dự kiến:\nTiêu đề: {subject}\nNội dung: {body}")
+        print(f"[WARN] Chua cau hinh SMTP_EMAIL/SMTP_PASSWORD. Skip gui email toi {to_email}.")
+        print(f"  Tieu de: {subject}\n  Noi dung: {body}")
         return
-        
+
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
     msg["From"] = sender_email
@@ -66,304 +95,283 @@ def send_email_notification(to_email: str, subject: str, body: str):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender_email, sender_password)
             server.send_message(msg)
-            print(f"Đã gửi email thành công tới {to_email}")
+            print(f"[OK] Da gui email thanh cong toi {to_email}")
     except Exception as e:
-        print(f"Lỗi khi gửi email tới {to_email}: {e}")
+        print(f"[ERROR] Loi khi gui email toi {to_email}: {e}")
+
+# ==============================================================================
+# Utility helpers
+# ==============================================================================
+def _generate_isbn(db: Session) -> str:
+    """Tao ISBN-13 hop le va chua ton tai trong DB."""
+    while True:
+        prefix = "978"
+        body = "".join([str(random.randint(0, 9)) for _ in range(9)])
+        partial = prefix + body
+        total = sum(
+            int(d) if i % 2 == 0 else int(d) * 3
+            for i, d in enumerate(partial)
+        )
+        check = (10 - (total % 10)) % 10
+        isbn = f"{prefix}-{body[0]}-{body[1:5]}-{body[5:9]}-{check}"
+        if not db.query(models.Book).filter(models.Book.isbn == isbn).first():
+            return isbn
+
+
+def _get_or_404(db: Session, model, pk_field, pk_value, label: str):
+    obj = db.query(model).filter(pk_field == pk_value).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail=f"Khong tim thay {label}")
+    return obj
+
+
+def _commit_or_rollback(db: Session):
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==============================================================================
+# Health & Debug
+# ==============================================================================
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to SmartLib API System (Connected to PostgreSQL)"}
+    return {"message": "SmartLib API v2.0 - Online"}
+
 
 @app.get("/api/test-db")
-def test_db_connection(db: Session = Depends(get_db)):
-    """
-    API dùng để kiểm tra xem Backend đã kết nối được với Neon PostgreSQL hay chưa.
-    """
+def test_db(db: Session = Depends(get_db)):
     try:
-        # Thử thực thi một câu lệnh SQL đơn giản
         db.execute(text("SELECT 1"))
-        return {"status": "success", "message": "Kết nối Database thành công! Dữ liệu đã sẵn sàng."}
+        return {"status": "ok", "message": "Ket noi Database thanh cong!"}
     except Exception as e:
-        return {"status": "error", "message": f"Kết nối thất bại. Chi tiết lỗi: {str(e)}"}
+        return {"status": "error", "message": str(e)}
 
+
+# ==============================================================================
+# Books
+# ==============================================================================
 @app.get("/api/books", response_model=List[schemas.BookResponse])
 def get_books(db: Session = Depends(get_db), limit: int = 100):
-    """
-    API lấy danh sách sách, kèm theo thông tin thể loại và vị trí nằm trên kệ.
-    """
-    books = db.query(models.Book).limit(limit).all()
-    return books
+    return db.query(models.Book).limit(limit).all()
+
 
 @app.get("/api/books/{book_id}", response_model=schemas.BookResponse)
-def get_book_by_id(book_id: int, db: Session = Depends(get_db)):
-    """
-    API lấy thông tin một cuốn sách cụ thể bằng ID.
-    """
-    book = db.query(models.Book).filter(models.Book.book_id == book_id).first()
-    if not book:
-        raise HTTPException(status_code=404, detail="Không tìm thấy cuốn sách này")
+def get_book(book_id: int, db: Session = Depends(get_db)):
+    return _get_or_404(db, models.Book, models.Book.book_id, book_id, "sach")
+
+
+@app.post("/api/books", response_model=schemas.BookResponse)
+def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
+    new_book = models.Book(**book_in.model_dump())
+    db.add(new_book)
+    _commit_or_rollback(db)
+    db.refresh(new_book)
+    return new_book
+
+
+@app.put("/api/books/{book_id}", response_model=schemas.BookResponse)
+def update_book(book_id: int, book_in: schemas.BookUpdate, db: Session = Depends(get_db)):
+    book = _get_or_404(db, models.Book, models.Book.book_id, book_id, "sach")
+    for key, value in book_in.model_dump(exclude_unset=True).items():
+        setattr(book, key, value)
+    _commit_or_rollback(db)
+    db.refresh(book)
     return book
+
+
+@app.delete("/api/books/{book_id}")
+def delete_book(book_id: int, db: Session = Depends(get_db)):
+    book = _get_or_404(db, models.Book, models.Book.book_id, book_id, "sach")
+    db.delete(book)
+    _commit_or_rollback(db)
+    return {"message": "Xoa sach thanh cong", "book_id": book_id}
+
 
 @app.post("/api/upload-image")
 async def upload_image(file: UploadFile = File(...)):
-    """
-    API upload ảnh bìa trực tiếp lên Cloudinary.
-    """
     try:
-        # Đọc nội dung file
-        file_contents = await file.read()
-        
-        # Upload lên Cloudinary
-        result = cloudinary.uploader.upload(file_contents, folder="smartlib_books")
-        
-        # Lấy URL của ảnh trên Cloudinary
-        image_url = result.get("secure_url")
-        
-        return {"image_url": image_url}
+        result = cloudinary.uploader.upload(await file.read(), folder="smartlib_books")
+        return {"image_url": result.get("secure_url")}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Không thể upload ảnh: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload that bai: {str(e)}")
+
 
 @app.post("/api/books/import-excel")
 async def import_books_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """
-    Nhập sách hàng loạt từ file Excel.
-    Cột yêu cầu: title, market_price
-    Cột tùy chọn: quantity (mặc định 1)
-    """
+    """Nhap sach hang loat tu Excel. Cot bat buoc: title, market_price. Tuy chon: quantity."""
     try:
-        contents = await file.read()
-        df = pd.read_excel(io.BytesIO(contents))
-        
-        required_cols = ['title', 'market_price']
-        for col in required_cols:
+        df = pd.read_excel(io.BytesIO(await file.read()))
+        for col in ["title", "market_price"]:
             if col not in df.columns:
-                raise HTTPException(status_code=400, detail=f"File Excel thiếu cột bắt buộc: {col}")
-                
-        books_created = 0
-        
-        for index, row in df.iterrows():
-            if pd.isna(row['title']):
+                raise HTTPException(status_code=400, detail=f"File thieu cot: {col}")
+
+        count = 0
+        for _, row in df.iterrows():
+            if pd.isna(row["title"]):
                 continue
-            title = str(row['title'])
-            market_price = float(row['market_price']) if not pd.isna(row['market_price']) else 0.0
-            quantity = int(row['quantity']) if 'quantity' in df.columns and not pd.isna(row['quantity']) else 1
-            
-            for _ in range(quantity):
-                while True:
-                    prefix = "978"
-                    d1 = str(random.randint(0, 9))
-                    d2 = str(random.randint(0, 9999)).zfill(4)
-                    d3 = str(random.randint(0, 9999)).zfill(4)
-                    partial = prefix + d1 + d2 + d3
-                    sum_digits = sum(int(digit) if i % 2 == 0 else int(digit) * 3 for i, digit in enumerate(partial))
-                    remainder = sum_digits % 10
-                    check_digit = 0 if remainder == 0 else 10 - remainder
-                    isbn = f"{prefix}-{d1}-{d2}-{d3}-{check_digit}"
-                    
-                    existing = db.query(models.Book).filter(models.Book.isbn == isbn).first()
-                    if not existing:
-                        break
-                        
-                new_book = models.Book(
-                    isbn=isbn,
-                    title=title,
-                    market_price=market_price,
-                    status="available"
-                )
-                db.add(new_book)
-                books_created += 1
-                
+            qty = int(row.get("quantity", 1)) if not pd.isna(row.get("quantity", 1)) else 1
+            for _ in range(qty):
+                db.add(models.Book(
+                    isbn=_generate_isbn(db),
+                    title=str(row["title"]),
+                    market_price=float(row["market_price"]),
+                    status="available",
+                ))
+                count += 1
+
         db.commit()
-        return {"message": f"Nhập thành công {books_created} cuốn sách."}
+        return {"message": f"Nhap thanh cong {count} cuon sach."}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/books", response_model=schemas.BookResponse)
-def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
-    """
-    API thêm mới một cuốn sách.
-    """
-    if book_in.location_id is not None:
-        existing_location_book = db.query(models.Book).filter(
-            models.Book.title == book_in.title,
-            models.Book.location_id != None,
-            models.Book.location_id != book_in.location_id
-        ).first()
-        if existing_location_book:
-            raise HTTPException(status_code=400, detail=f"Sách '{book_in.title}' đã được xếp ở vị trí khác. Một tựa sách chỉ ở duy nhất 1 vị trí.")
-            
-    new_book = models.Book(**book_in.model_dump())
-    db.add(new_book)
-    try:
-        db.commit()
-        db.refresh(new_book)
-        return new_book
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
 
-@app.put("/api/books/{book_id}", response_model=schemas.BookResponse)
-def update_book(book_id: int, book_in: schemas.BookUpdate, db: Session = Depends(get_db)):
-    """
-    API cập nhật thông tin sách.
-    """
-    book = db.query(models.Book).filter(models.Book.book_id == book_id).first()
-    if not book:
-        raise HTTPException(status_code=404, detail="Không tìm thấy cuốn sách này")
-    
-    target_title = book_in.title if book_in.title else book.title
-    if 'location_id' in book_in.model_dump(exclude_unset=True) and book_in.location_id is not None:
-        existing_location_book = db.query(models.Book).filter(
-            models.Book.title == target_title,
-            models.Book.book_id != book_id,
-            models.Book.location_id != None,
-            models.Book.location_id != book_in.location_id
-        ).first()
-        if existing_location_book:
-            raise HTTPException(status_code=400, detail=f"Sách '{target_title}' đã được xếp ở vị trí khác. Một tựa sách chỉ ở duy nhất 1 vị trí.")
-            
-    update_data = book_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(book, key, value)
-        
-    try:
-        db.commit()
-        db.refresh(book)
-        return book
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.delete("/api/books/{book_id}")
-def delete_book(book_id: int, db: Session = Depends(get_db)):
-    """
-    API xóa sách (Xóa vĩnh viễn hoặc có thể bạn đổi status thành deleted tùy yêu cầu).
-    Ở đây sẽ thực hiện xóa vĩnh viễn.
-    """
-    book = db.query(models.Book).filter(models.Book.book_id == book_id).first()
-    if not book:
-        raise HTTPException(status_code=404, detail="Không tìm thấy cuốn sách này")
-        
-    try:
-        db.delete(book)
-        db.commit()
-        return {"message": "Xóa sách thành công", "book_id": book_id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
-
+# ==============================================================================
+# Locations
+# ==============================================================================
 @app.get("/api/locations", response_model=List[schemas.Location])
 def get_locations(db: Session = Depends(get_db)):
-    """
-    Lấy danh sách điểm lưu trữ (vị trí/kệ)
-    """
     return db.query(models.Location).all()
 
+
 @app.post("/api/locations", response_model=schemas.Location)
-def create_location(location_in: schemas.LocationCreate, db: Session = Depends(get_db)):
-    """
-    Tạo vị trí kệ sách mới
-    """
-    new_location = models.Location(**location_in.model_dump())
-    db.add(new_location)
-    try:
-        db.commit()
-        db.refresh(new_location)
-        return new_location
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+def create_location(loc_in: schemas.LocationCreate, db: Session = Depends(get_db)):
+    new_loc = models.Location(**loc_in.model_dump())
+    db.add(new_loc)
+    _commit_or_rollback(db)
+    db.refresh(new_loc)
+    return new_loc
+
 
 @app.put("/api/locations/{location_id}", response_model=schemas.Location)
-def update_location(location_id: int, location_in: schemas.LocationCreate, db: Session = Depends(get_db)):
-    """
-    Cập nhật vị trí kệ sách
-    """
-    location = db.query(models.Location).filter(models.Location.location_id == location_id).first()
-    if not location:
-        raise HTTPException(status_code=404, detail="Không tìm thấy vị trí này")
-    
-    update_data = location_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(location, key, value)
-        
-    try:
-        db.commit()
-        db.refresh(location)
-        return location
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+def update_location(location_id: int, loc_in: schemas.LocationCreate, db: Session = Depends(get_db)):
+    loc = _get_or_404(db, models.Location, models.Location.location_id, location_id, "vi tri")
+    for key, value in loc_in.model_dump(exclude_unset=True).items():
+        setattr(loc, key, value)
+    _commit_or_rollback(db)
+    db.refresh(loc)
+    return loc
+
 
 @app.delete("/api/locations/{location_id}")
 def delete_location(location_id: int, db: Session = Depends(get_db)):
-    """
-    Xóa vị trí kệ sách. Tự động gỡ các sách khỏi kệ này (location_id = NULL) trước khi xóa.
-    """
-    location = db.query(models.Location).filter(models.Location.location_id == location_id).first()
-    if not location:
-        raise HTTPException(status_code=404, detail="Không tìm thấy vị trí này")
-        
-    try:
-        # Smart Delete: Chuyển sách về Kệ Chờ
-        db.query(models.Book).filter(models.Book.location_id == location_id).update({"location_id": None})
-        
-        # Xóa kệ
-        db.delete(location)
-        db.commit()
-        return {"message": "Xóa vị trí thành công", "location_id": location_id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+    loc = _get_or_404(db, models.Location, models.Location.location_id, location_id, "vi tri")
+    db.query(models.Book).filter(models.Book.location_id == location_id).update({"location_id": None})
+    db.delete(loc)
+    _commit_or_rollback(db)
+    return {"message": "Xoa vi tri thanh cong", "location_id": location_id}
 
+
+# ==============================================================================
+# Registration & PayOS Payment
+# ==============================================================================
 @app.post("/api/register", response_model=schemas.RegistrationRequestResponse)
 def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depends(get_db)):
-    """
-    API tạo yêu cầu đăng ký người dùng mới.
-    """
-    # Check if user_code already exists in registration_requests
-    existing_req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.user_code == req_in.user_code).first()
-    if existing_req:
-        raise HTTPException(status_code=400, detail="Mã sinh viên/CCCD này đã có yêu cầu đăng ký.")
-        
-    new_request = models.RegistrationRequest(**req_in.model_dump())
-    db.add(new_request)
-    try:
-        db.commit()
-        db.refresh(new_request)
-        return new_request
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+    # 1. Kiem tra trung lap
+    existing = db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.user_code == req_in.user_code
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ma sinh vien nay da dang ky roi!")
 
+    # 2. Luu vao DB
+    try:
+        new_req = models.RegistrationRequest(**req_in.model_dump())
+        db.add(new_req)
+        db.commit()
+        db.refresh(new_req)
+
+        # Tao ma don hang duy nhat cho PayOS
+        order_code = int(f"{int(time.time())}")
+        new_req.payos_order_code = order_code
+        db.commit()
+
+        # 3. Goi PayOS
+        try:
+            payment_request = CreatePaymentLinkRequest(
+                order_code=order_code,
+                amount=CARD_FEE,
+                description=f"DK {new_req.user_code}"[:25],
+                items=[ItemData(name=f"SmartLib {new_req.user_code}", quantity=1, price=CARD_FEE)],
+                return_url=f"{BACKEND_URL}/payment-success",
+                cancel_url=f"{BACKEND_URL}/payment-success",
+            )
+            payos_response = payos_client.payment_requests.create(payment_request)
+
+            return {
+                "request_id": new_req.request_id,
+                "user_code": new_req.user_code,
+                "full_name": new_req.full_name,
+                "request_status": new_req.request_status,
+                "checkoutUrl": payos_response.checkout_url
+            }
+        except Exception as payos_err:
+            print(f"PayOS Error: {str(payos_err)}")
+            raise HTTPException(status_code=400, detail=f"Loi PayOS: {str(payos_err)}. Hay kiem tra Client ID/API Key tren Render!")
+
+    except Exception as db_err:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Loi Database: {str(db_err)}")
+
+
+@app.post("/api/payos-webhook")
+def payos_webhook(payload: dict, db: Session = Depends(get_db)):
+    """Nhan thong bao thanh toan thanh cong tu PayOS."""
+    try:
+        order_code = payload.get("data", {}).get("orderCode")
+        if order_code:
+            req = db.query(models.RegistrationRequest).filter(
+                models.RegistrationRequest.payos_order_code == order_code
+            ).first()
+            if req:
+                req.payment_status = "paid"
+                db.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ==============================================================================
+# Registration - Duyet don / Tu choi
+# ==============================================================================
 @app.get("/api/registration-requests", response_model=List[schemas.RegistrationRequestResponse])
 def get_registration_requests(db: Session = Depends(get_db)):
-    """
-    Lấy danh sách các đơn đăng ký đang chờ duyệt.
-    """
-    return db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_status == 'pending').all()
+    """Lay danh sach cac don dang ky dang cho duyet."""
+    return db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.request_status == "pending"
+    ).all()
+
 
 @app.post("/api/registration-requests/{request_id}/approve")
-def approve_registration_request(request_id: int, payload: schemas.RegistrationApprove, db: Session = Depends(get_db)):
-    """
-    Duyệt đơn đăng ký, tạo User mới với thẻ NFC.
-    """
-    req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
+def approve_registration_request(
+    request_id: int,
+    payload: schemas.RegistrationApprove,
+    db: Session = Depends(get_db)
+):
+    """Duyet don dang ky, tao User moi voi the NFC."""
+    req = db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.request_id == request_id
+    ).first()
     if not req:
-        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký.")
+        raise HTTPException(status_code=404, detail="Khong tim thay don dang ky.")
     if req.request_status != "pending":
-        raise HTTPException(status_code=400, detail=f"Đơn này đã được xử lý ({req.request_status}).")
-        
-    # Kiểm tra xem NFC này đã được gán cho user nào chưa
-    existing_nfc = db.query(models.User).filter(models.User.nfc_tag_id == payload.nfc_serial).first()
+        raise HTTPException(status_code=400, detail=f"Don nay da duoc xu ly ({req.request_status}).")
+
+    # Kiem tra xem NFC nay da duoc gan cho user nao chua
+    existing_nfc = db.query(models.User).filter(
+        models.User.nfc_tag_id == payload.nfc_serial
+    ).first()
     if existing_nfc:
-        raise HTTPException(status_code=400, detail="Thẻ NFC này đã được gán cho một người dùng khác.")
-        
+        raise HTTPException(status_code=400, detail="The NFC nay da duoc gan cho mot nguoi dung khac.")
+
     try:
-        # Cập nhật trạng thái
         req.request_status = "approved"
-        
-        # Tạo User mới
+
         new_user = models.User(
             user_code=req.user_code,
             full_name=req.full_name,
@@ -377,46 +385,114 @@ def approve_registration_request(request_id: int, payload: schemas.RegistrationA
         )
         db.add(new_user)
         db.commit()
-        
-        # Gửi Email thông báo
+
+        # Gui Email thong bao
         if req.email:
-            body = (f"Chào {req.full_name},\\n\\n"
-                    f"Đơn đăng ký làm thẻ mượn sách thư viện của bạn ĐÃ ĐƯỢC DUYỆT.\\n"
-                    f"Tài khoản của bạn đã được liên kết với thẻ NFC mang số serial: {payload.nfc_serial}.\\n\\n"
-                    f"Vui lòng đến quầy thủ thư để nhận thẻ vật lý (trong trường hợp thư viện cấp thẻ cho bạn).\\n\\n"
-                    f"Trân trọng,\\nBan Quản Trị Thư Viện.")
-            send_email_notification(req.email, "Thông Báo Duyệt Đăng Ký Thư Viện", body)
-            
-        return {"message": "Đã duyệt và tạo người dùng thành công"}
+            body = (
+                f"Chao {req.full_name},\n\n"
+                f"Don dang ky lam the muon sach thu vien cua ban DA DUOC DUYET.\n"
+                f"Tai khoan cua ban da duoc lien ket voi the NFC mang so serial: {payload.nfc_serial}.\n\n"
+                f"Vui long den quay thu thu de nhan the vat ly.\n\n"
+                f"Tran trong,\nBan Quan Tri Thu Vien."
+            )
+            send_email_notification(req.email, "Thong Bao Duyet Dang Ky Thu Vien", body)
+
+        return {"message": "Da duyet va tao nguoi dung thanh cong"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/registration-requests/{request_id}/reject")
-def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, db: Session = Depends(get_db)):
-    """
-    Từ chối đơn đăng ký.
-    """
-    req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
+def reject_registration_request(
+    request_id: int,
+    payload: schemas.RegistrationReject,
+    db: Session = Depends(get_db)
+):
+    """Tu choi don dang ky."""
+    req = db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.request_id == request_id
+    ).first()
     if not req:
-        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký.")
+        raise HTTPException(status_code=404, detail="Khong tim thay don dang ky.")
     if req.request_status != "pending":
-        raise HTTPException(status_code=400, detail=f"Đơn này đã được xử lý ({req.request_status}).")
-        
+        raise HTTPException(status_code=400, detail=f"Don nay da duoc xu ly ({req.request_status}).")
+
     try:
         req.request_status = "rejected"
         db.commit()
-        
-        # Gửi Email từ chối
+
+        # Gui Email tu choi
         if req.email:
-            body = (f"Chào {req.full_name},\\n\\n"
-                    f"Rất tiếc, đơn đăng ký thư viện của bạn bị TỪ CHỐI.\\n"
-                    f"Lý do: {payload.reason}\\n\\n"
-                    f"Vui lòng liên hệ thủ thư để được làm thủ tục hoàn tiền (nếu có).\\n\\n"
-                    f"Trân trọng,\\nBan Quản Trị Thư Viện.")
-            send_email_notification(req.email, "Thông Báo Từ Chối Đăng Ký Thư Viện", body)
-            
-        return {"message": "Đã từ chối đơn đăng ký"}
+            body = (
+                f"Chao {req.full_name},\n\n"
+                f"Rat tiec, don dang ky thu vien cua ban bi TU CHOI.\n"
+                f"Ly do: {payload.reason}\n\n"
+                f"Vui long lien he thu thu de duoc lam thu tuc hoan tien (neu co).\n\n"
+                f"Tran trong,\nBan Quan Tri Thu Vien."
+            )
+            send_email_notification(req.email, "Thong Bao Tu Choi Dang Ky Thu Vien", body)
+
+        return {"message": "Da tu choi don dang ky"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================================================================
+# Users
+# ==============================================================================
+@app.get("/api/users", response_model=List[schemas.UserResponse])
+def get_users(db: Session = Depends(get_db)):
+    """Lay danh sach tat ca nguoi dung da duoc phe duyet."""
+    return db.query(models.User).all()
+
+
+# ==============================================================================
+# Payment success page
+# ==============================================================================
+@app.get("/payment-success", response_class=HTMLResponse)
+def payment_success_page():
+    """Trang xac nhan thanh toan thanh cong, hien ra sau khi chuyen khoan."""
+    return """<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thanh toan SmartLib</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #FFF7DD;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 8px 30px rgba(128,161,186,0.2);
+      padding: 50px 40px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon { font-size: 72px; margin-bottom: 20px; }
+    h1 { color: #91C4C3; font-size: 28px; margin-bottom: 16px; }
+    p { color: #80A1BA; font-size: 16px; line-height: 1.7; margin-bottom: 10px; }
+    .note { font-size: 13px; color: #ccc; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Giao dich hoan tat!</h1>
+    <p>Yeu cau dang ky the <strong>SmartLib</strong> cua ban da duoc tiep nhan.</p>
+    <p>📩 Vui long quay lai ung dung va cho <strong>email xac nhan</strong> phe duyet tu thu vien.</p>
+    <p class="note">Ban co the dong cua so trinh duyet nay.</p>
+  </div>
+</body>
+</html>"""
