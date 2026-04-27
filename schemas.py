@@ -77,7 +77,7 @@ class RegistrationRequestResponse(BaseModel):
     user_code: str
     full_name: str
     request_status: str
-    invoice_image_url: Optional[str] = None
+    checkoutUrl: Optional[str] = None
 
     class Config:
         from_attributes = True
