@@ -66,19 +66,6 @@ Tham số `--reload` giúp server tự khởi động lại mỗi khi bạn Ctrl
 - **Kiểm thử API (Swagger UI):** Mở trình duyệt và truy cập: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Tại đây, FastAPI đã tạo sẵn bộ UI để bạn có thể test trực tiếp việc thêm/xóa/sửa (Try it out) giống hệt như trên Postman cấu hình sẵn.
 
----
 
-## 🚀 Quy trình Đẩy lên máy chủ thật (Deploy / Production)
-
-Ứng dụng hiện đang được thiết lập để **tự động Deploy lại lên Render** mỗi khi có thay đổi code đẩy (push) lên nhánh `main` của GitHub.
-
-Quy trình phát triển tính năng mới với team:
-1. Viết code tính năng mới, tạo API mới dưới máy local.
-2. Chạy thử `uvicorn` và test kĩ trên trang Local (`http://localhost:8000/docs`).
-3. Nếu tất cả OK, tiến hành: `git add .` -> `git commit -m "Tính năng ABC"` -> `git push`.
-4. Lên Render kiểm tra tab `Logs` xem quá trình build thành công chưa.
-5. Nếu Frontend muốn báo test với thực tế, cung cấp cho Frontend đường dẫn Render của dự án với đuôi `/docs` (Ví dụ: `https://<tên-webapp-render-của-bạn>.onrender.com/docs`).
-
----
 
 **Happy Coding!** Nếu có thắc mắc trong quá trình ghép code, hãy tham khảo tài liệu của [FastAPI Docs](https://fastapi.tiangolo.com/) để làm quen với cấu trúc.
