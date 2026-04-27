@@ -72,6 +72,22 @@ class RegistrationRequest(Base):
     phone_number = Column(String(15), nullable=True)
     address = Column(Text, nullable=True)
     email = Column(String(100), nullable=True)
+    invoice_image_url = Column(String(500), nullable=True)
     request_status = Column(String(20), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(Integer, primary_key=True, index=True)
+    user_code = Column(String(20), unique=True, nullable=False)
+    full_name = Column(String(255), nullable=False)
+    gender = Column(String(10), nullable=True)
+    birth_year = Column(Integer, nullable=True)
+    phone_number = Column(String(15), nullable=True)
+    address = Column(Text, nullable=True)
+    email = Column(String(100), nullable=True)
+    nfc_tag_id = Column(String(50), unique=True, nullable=True)
+    user_type = Column(String(20), default="student")
+    status = Column(String(20), default="pending_nfc")
+    created_at = Column(DateTime, default=datetime.utcnow)

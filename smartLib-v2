@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict IYMXEcsCui55QPWfsYgsp0KdUvmijdoRFGqK7yHVVGYYao9NK0IsXuDgZ3qUl6b
+\restrict l7eUORHb2BX34JJhEzXkTmxkwbxhhZyOKq3DDks6tVhpjXTBCRBgSzQSZA6ARpd
 
--- Dumped from database version 17.8 (a48d9ca)
+-- Dumped from database version 17.8 (130b160)
 -- Dumped by pg_dump version 18.1
 
--- Started on 2026-04-21 21:25:12
+-- Started on 2026-04-27 19:22:14
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -15,14 +15,54 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
+SELECT pg_catalog.set_config('search_path', 'public', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 239 (class 1255 OID 32943)
+-- TOC entry 4 (class 2615 OID 2200)
+-- Name: public; Type: SCHEMA; Schema: -; Owner: pg_database_owner
+--
+
+CREATE SCHEMA public;
+
+
+ALTER SCHEMA public OWNER TO pg_database_owner;
+
+--
+-- TOC entry 3505 (class 0 OID 0)
+-- Dependencies: 4
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: pg_database_owner
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- TOC entry 243 (class 1255 OID 49165)
+-- Name: approve_registration(); Type: FUNCTION; Schema: public; Owner: neondb_owner
+--
+
+CREATE FUNCTION public.approve_registration() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Chỉ insert sang bảng users khi trạng thái đổi từ 'pending' sang 'approved'
+    IF NEW.request_status = 'approved' AND OLD.request_status = 'pending' THEN
+        INSERT INTO users (user_code, full_name, gender, birth_year, phone_number, address, email, status)
+        VALUES (NEW.user_code, NEW.full_name, NEW.gender, NEW.birth_year, NEW.phone_number, NEW.address, NEW.email, 'pending_nfc');
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.approve_registration() OWNER TO neondb_owner;
+
+--
+-- TOC entry 241 (class 1255 OID 32943)
 -- Name: confirm_nfc_payment(integer, character varying, integer); Type: PROCEDURE; Schema: public; Owner: neondb_owner
 --
 
@@ -54,7 +94,7 @@ $$;
 ALTER PROCEDURE public.confirm_nfc_payment(IN p_order_id integer, IN p_payment_method character varying, IN p_librarian_id integer) OWNER TO neondb_owner;
 
 --
--- TOC entry 240 (class 1255 OID 32944)
+-- TOC entry 242 (class 1255 OID 32944)
 -- Name: process_return(integer); Type: PROCEDURE; Schema: public; Owner: neondb_owner
 --
 
@@ -113,7 +153,7 @@ $$;
 ALTER PROCEDURE public.process_return(IN p_transaction_id integer) OWNER TO neondb_owner;
 
 --
--- TOC entry 238 (class 1255 OID 32941)
+-- TOC entry 240 (class 1255 OID 32941)
 -- Name: set_deposit_and_status(); Type: FUNCTION; Schema: public; Owner: neondb_owner
 --
 
@@ -176,7 +216,7 @@ CREATE SEQUENCE public.books_book_id_seq
 ALTER SEQUENCE public.books_book_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3491 (class 0 OID 0)
+-- TOC entry 3506 (class 0 OID 0)
 -- Dependencies: 231
 -- Name: books_book_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -215,7 +255,7 @@ CREATE SEQUENCE public.categories_category_id_seq
 ALTER SEQUENCE public.categories_category_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3492 (class 0 OID 0)
+-- TOC entry 3507 (class 0 OID 0)
 -- Dependencies: 217
 -- Name: categories_category_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -255,7 +295,7 @@ CREATE SEQUENCE public.fine_settings_setting_id_seq
 ALTER SEQUENCE public.fine_settings_setting_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3493 (class 0 OID 0)
+-- TOC entry 3508 (class 0 OID 0)
 -- Dependencies: 221
 -- Name: fine_settings_setting_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -296,7 +336,7 @@ CREATE SEQUENCE public.import_logs_import_id_seq
 ALTER SEQUENCE public.import_logs_import_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3494 (class 0 OID 0)
+-- TOC entry 3509 (class 0 OID 0)
 -- Dependencies: 229
 -- Name: import_logs_import_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -341,7 +381,7 @@ CREATE SEQUENCE public.invoices_invoice_id_seq
 ALTER SEQUENCE public.invoices_invoice_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3495 (class 0 OID 0)
+-- TOC entry 3510 (class 0 OID 0)
 -- Dependencies: 227
 -- Name: invoices_invoice_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -383,7 +423,7 @@ CREATE SEQUENCE public.locations_location_id_seq
 ALTER SEQUENCE public.locations_location_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3496 (class 0 OID 0)
+-- TOC entry 3511 (class 0 OID 0)
 -- Dependencies: 219
 -- Name: locations_location_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -426,7 +466,7 @@ CREATE SEQUENCE public.nfc_orders_order_id_seq
 ALTER SEQUENCE public.nfc_orders_order_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3497 (class 0 OID 0)
+-- TOC entry 3512 (class 0 OID 0)
 -- Dependencies: 225
 -- Name: nfc_orders_order_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -448,6 +488,52 @@ CREATE TABLE public.recommendations (
 
 
 ALTER TABLE public.recommendations OWNER TO neondb_owner;
+
+--
+-- TOC entry 239 (class 1259 OID 49153)
+-- Name: registration_requests; Type: TABLE; Schema: public; Owner: neondb_owner
+--
+
+CREATE TABLE public.registration_requests (
+    request_id integer NOT NULL,
+    user_code character varying(20) NOT NULL,
+    full_name character varying(255) NOT NULL,
+    gender character varying(10),
+    birth_year integer,
+    phone_number character varying(15),
+    address text,
+    email character varying(100),
+    request_status character varying(20) DEFAULT 'pending'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.registration_requests OWNER TO neondb_owner;
+
+--
+-- TOC entry 238 (class 1259 OID 49152)
+-- Name: registration_requests_request_id_seq; Type: SEQUENCE; Schema: public; Owner: neondb_owner
+--
+
+CREATE SEQUENCE public.registration_requests_request_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.registration_requests_request_id_seq OWNER TO neondb_owner;
+
+--
+-- TOC entry 3513 (class 0 OID 0)
+-- Dependencies: 238
+-- Name: registration_requests_request_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
+--
+
+ALTER SEQUENCE public.registration_requests_request_id_seq OWNED BY public.registration_requests.request_id;
+
 
 --
 -- TOC entry 234 (class 1259 OID 32887)
@@ -487,7 +573,7 @@ CREATE SEQUENCE public.transactions_transaction_id_seq
 ALTER SEQUENCE public.transactions_transaction_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3498 (class 0 OID 0)
+-- TOC entry 3514 (class 0 OID 0)
 -- Dependencies: 233
 -- Name: transactions_transaction_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -535,7 +621,7 @@ CREATE SEQUENCE public.users_user_id_seq
 ALTER SEQUENCE public.users_user_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3499 (class 0 OID 0)
+-- TOC entry 3515 (class 0 OID 0)
 -- Dependencies: 223
 -- Name: users_user_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -578,7 +664,7 @@ CREATE SEQUENCE public.wallet_transactions_wallet_tx_id_seq
 ALTER SEQUENCE public.wallet_transactions_wallet_tx_id_seq OWNER TO neondb_owner;
 
 --
--- TOC entry 3500 (class 0 OID 0)
+-- TOC entry 3516 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: wallet_transactions_wallet_tx_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: neondb_owner
 --
@@ -587,87 +673,95 @@ ALTER SEQUENCE public.wallet_transactions_wallet_tx_id_seq OWNED BY public.walle
 
 
 --
--- TOC entry 3278 (class 2604 OID 32863)
+-- TOC entry 3284 (class 2604 OID 32863)
 -- Name: books book_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.books ALTER COLUMN book_id SET DEFAULT nextval('public.books_book_id_seq'::regclass);
+ALTER TABLE ONLY public.books ALTER COLUMN book_id SET DEFAULT nextval('books_book_id_seq'::regclass);
 
 
 --
--- TOC entry 3262 (class 2604 OID 32772)
+-- TOC entry 3268 (class 2604 OID 32772)
 -- Name: categories category_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.categories ALTER COLUMN category_id SET DEFAULT nextval('public.categories_category_id_seq'::regclass);
+ALTER TABLE ONLY public.categories ALTER COLUMN category_id SET DEFAULT nextval('categories_category_id_seq'::regclass);
 
 
 --
--- TOC entry 3264 (class 2604 OID 32790)
+-- TOC entry 3270 (class 2604 OID 32790)
 -- Name: fine_settings setting_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.fine_settings ALTER COLUMN setting_id SET DEFAULT nextval('public.fine_settings_setting_id_seq'::regclass);
+ALTER TABLE ONLY public.fine_settings ALTER COLUMN setting_id SET DEFAULT nextval('fine_settings_setting_id_seq'::regclass);
 
 
 --
--- TOC entry 3276 (class 2604 OID 32853)
+-- TOC entry 3282 (class 2604 OID 32853)
 -- Name: import_logs import_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.import_logs ALTER COLUMN import_id SET DEFAULT nextval('public.import_logs_import_id_seq'::regclass);
+ALTER TABLE ONLY public.import_logs ALTER COLUMN import_id SET DEFAULT nextval('import_logs_import_id_seq'::regclass);
 
 
 --
--- TOC entry 3273 (class 2604 OID 32832)
+-- TOC entry 3279 (class 2604 OID 32832)
 -- Name: invoices invoice_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.invoices ALTER COLUMN invoice_id SET DEFAULT nextval('public.invoices_invoice_id_seq'::regclass);
+ALTER TABLE ONLY public.invoices ALTER COLUMN invoice_id SET DEFAULT nextval('invoices_invoice_id_seq'::regclass);
 
 
 --
--- TOC entry 3263 (class 2604 OID 32781)
+-- TOC entry 3269 (class 2604 OID 32781)
 -- Name: locations location_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.locations ALTER COLUMN location_id SET DEFAULT nextval('public.locations_location_id_seq'::regclass);
+ALTER TABLE ONLY public.locations ALTER COLUMN location_id SET DEFAULT nextval('locations_location_id_seq'::regclass);
 
 
 --
--- TOC entry 3269 (class 2604 OID 32815)
+-- TOC entry 3275 (class 2604 OID 32815)
 -- Name: nfc_orders order_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.nfc_orders ALTER COLUMN order_id SET DEFAULT nextval('public.nfc_orders_order_id_seq'::regclass);
+ALTER TABLE ONLY public.nfc_orders ALTER COLUMN order_id SET DEFAULT nextval('nfc_orders_order_id_seq'::regclass);
 
 
 --
--- TOC entry 3282 (class 2604 OID 32890)
+-- TOC entry 3296 (class 2604 OID 49156)
+-- Name: registration_requests request_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.registration_requests ALTER COLUMN request_id SET DEFAULT nextval('registration_requests_request_id_seq'::regclass);
+
+
+--
+-- TOC entry 3288 (class 2604 OID 32890)
 -- Name: transactions transaction_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.transactions ALTER COLUMN transaction_id SET DEFAULT nextval('public.transactions_transaction_id_seq'::regclass);
+ALTER TABLE ONLY public.transactions ALTER COLUMN transaction_id SET DEFAULT nextval('transactions_transaction_id_seq'::regclass);
 
 
 --
--- TOC entry 3265 (class 2604 OID 32799)
+-- TOC entry 3271 (class 2604 OID 32799)
 -- Name: users user_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.users ALTER COLUMN user_id SET DEFAULT nextval('public.users_user_id_seq'::regclass);
+ALTER TABLE ONLY public.users ALTER COLUMN user_id SET DEFAULT nextval('users_user_id_seq'::regclass);
 
 
 --
--- TOC entry 3287 (class 2604 OID 32911)
+-- TOC entry 3293 (class 2604 OID 32911)
 -- Name: wallet_transactions wallet_tx_id; Type: DEFAULT; Schema: public; Owner: neondb_owner
 --
 
-ALTER TABLE ONLY public.wallet_transactions ALTER COLUMN wallet_tx_id SET DEFAULT nextval('public.wallet_transactions_wallet_tx_id_seq'::regclass);
+ALTER TABLE ONLY public.wallet_transactions ALTER COLUMN wallet_tx_id SET DEFAULT nextval('wallet_transactions_wallet_tx_id_seq'::regclass);
 
 
 --
--- TOC entry 3315 (class 2606 OID 32870)
+-- TOC entry 3324 (class 2606 OID 32870)
 -- Name: books books_isbn_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -676,7 +770,7 @@ ALTER TABLE ONLY public.books
 
 
 --
--- TOC entry 3317 (class 2606 OID 32868)
+-- TOC entry 3326 (class 2606 OID 32868)
 -- Name: books books_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -685,7 +779,7 @@ ALTER TABLE ONLY public.books
 
 
 --
--- TOC entry 3291 (class 2606 OID 32776)
+-- TOC entry 3300 (class 2606 OID 32776)
 -- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -694,7 +788,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- TOC entry 3295 (class 2606 OID 32792)
+-- TOC entry 3304 (class 2606 OID 32792)
 -- Name: fine_settings fine_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -703,7 +797,7 @@ ALTER TABLE ONLY public.fine_settings
 
 
 --
--- TOC entry 3297 (class 2606 OID 32794)
+-- TOC entry 3306 (class 2606 OID 32794)
 -- Name: fine_settings fine_settings_user_type_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -712,7 +806,7 @@ ALTER TABLE ONLY public.fine_settings
 
 
 --
--- TOC entry 3313 (class 2606 OID 32858)
+-- TOC entry 3322 (class 2606 OID 32858)
 -- Name: import_logs import_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -721,7 +815,7 @@ ALTER TABLE ONLY public.import_logs
 
 
 --
--- TOC entry 3309 (class 2606 OID 32838)
+-- TOC entry 3318 (class 2606 OID 32838)
 -- Name: invoices invoices_invoice_code_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -730,7 +824,7 @@ ALTER TABLE ONLY public.invoices
 
 
 --
--- TOC entry 3311 (class 2606 OID 32836)
+-- TOC entry 3320 (class 2606 OID 32836)
 -- Name: invoices invoices_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -739,7 +833,7 @@ ALTER TABLE ONLY public.invoices
 
 
 --
--- TOC entry 3293 (class 2606 OID 32785)
+-- TOC entry 3302 (class 2606 OID 32785)
 -- Name: locations locations_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -748,7 +842,7 @@ ALTER TABLE ONLY public.locations
 
 
 --
--- TOC entry 3307 (class 2606 OID 32822)
+-- TOC entry 3316 (class 2606 OID 32822)
 -- Name: nfc_orders nfc_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -757,7 +851,7 @@ ALTER TABLE ONLY public.nfc_orders
 
 
 --
--- TOC entry 3327 (class 2606 OID 32930)
+-- TOC entry 3336 (class 2606 OID 32930)
 -- Name: recommendations recommendations_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -766,7 +860,25 @@ ALTER TABLE ONLY public.recommendations
 
 
 --
--- TOC entry 3323 (class 2606 OID 32896)
+-- TOC entry 3338 (class 2606 OID 49162)
+-- Name: registration_requests registration_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.registration_requests
+    ADD CONSTRAINT registration_requests_pkey PRIMARY KEY (request_id);
+
+
+--
+-- TOC entry 3340 (class 2606 OID 49164)
+-- Name: registration_requests registration_requests_user_code_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
+--
+
+ALTER TABLE ONLY public.registration_requests
+    ADD CONSTRAINT registration_requests_user_code_key UNIQUE (user_code);
+
+
+--
+-- TOC entry 3332 (class 2606 OID 32896)
 -- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -775,7 +887,7 @@ ALTER TABLE ONLY public.transactions
 
 
 --
--- TOC entry 3300 (class 2606 OID 32810)
+-- TOC entry 3309 (class 2606 OID 32810)
 -- Name: users users_nfc_tag_id_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -784,7 +896,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3302 (class 2606 OID 32806)
+-- TOC entry 3311 (class 2606 OID 32806)
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -793,7 +905,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3304 (class 2606 OID 32808)
+-- TOC entry 3313 (class 2606 OID 32808)
 -- Name: users users_user_code_key; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -802,7 +914,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 3325 (class 2606 OID 32914)
+-- TOC entry 3334 (class 2606 OID 32914)
 -- Name: wallet_transactions wallet_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
@@ -811,7 +923,7 @@ ALTER TABLE ONLY public.wallet_transactions
 
 
 --
--- TOC entry 3318 (class 1259 OID 32947)
+-- TOC entry 3327 (class 1259 OID 32947)
 -- Name: idx_books_import; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -819,7 +931,7 @@ CREATE INDEX idx_books_import ON public.books USING btree (import_id);
 
 
 --
--- TOC entry 3319 (class 1259 OID 32946)
+-- TOC entry 3328 (class 1259 OID 32946)
 -- Name: idx_books_isbn; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -827,7 +939,7 @@ CREATE INDEX idx_books_isbn ON public.books USING btree (isbn);
 
 
 --
--- TOC entry 3305 (class 1259 OID 32950)
+-- TOC entry 3314 (class 1259 OID 32950)
 -- Name: idx_nfc_orders_status; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -835,7 +947,7 @@ CREATE INDEX idx_nfc_orders_status ON public.nfc_orders USING btree (payment_sta
 
 
 --
--- TOC entry 3320 (class 1259 OID 32948)
+-- TOC entry 3329 (class 1259 OID 32948)
 -- Name: idx_trans_status; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -843,7 +955,7 @@ CREATE INDEX idx_trans_status ON public.transactions USING btree (status) WHERE 
 
 
 --
--- TOC entry 3321 (class 1259 OID 32949)
+-- TOC entry 3330 (class 1259 OID 32949)
 -- Name: idx_trans_user_book; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -851,7 +963,7 @@ CREATE INDEX idx_trans_user_book ON public.transactions USING btree (user_id, bo
 
 
 --
--- TOC entry 3298 (class 1259 OID 32945)
+-- TOC entry 3307 (class 1259 OID 32945)
 -- Name: idx_users_nfc; Type: INDEX; Schema: public; Owner: neondb_owner
 --
 
@@ -859,123 +971,131 @@ CREATE INDEX idx_users_nfc ON public.users USING btree (nfc_tag_id);
 
 
 --
--- TOC entry 3340 (class 2620 OID 32942)
+-- TOC entry 3353 (class 2620 OID 32942)
 -- Name: transactions trg_on_borrow; Type: TRIGGER; Schema: public; Owner: neondb_owner
 --
 
-CREATE TRIGGER trg_on_borrow BEFORE INSERT ON public.transactions FOR EACH ROW EXECUTE FUNCTION public.set_deposit_and_status();
+CREATE TRIGGER trg_on_borrow BEFORE INSERT ON public.transactions FOR EACH ROW EXECUTE FUNCTION set_deposit_and_status();
 
 
 --
--- TOC entry 3331 (class 2606 OID 32871)
+-- TOC entry 3354 (class 2620 OID 49166)
+-- Name: registration_requests trg_on_registration_approve; Type: TRIGGER; Schema: public; Owner: neondb_owner
+--
+
+CREATE TRIGGER trg_on_registration_approve AFTER UPDATE ON public.registration_requests FOR EACH ROW EXECUTE FUNCTION approve_registration();
+
+
+--
+-- TOC entry 3344 (class 2606 OID 32871)
 -- Name: books books_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.books
-    ADD CONSTRAINT books_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(category_id);
+    ADD CONSTRAINT books_category_id_fkey FOREIGN KEY (category_id) REFERENCES categories(category_id);
 
 
 --
--- TOC entry 3332 (class 2606 OID 32881)
+-- TOC entry 3345 (class 2606 OID 32881)
 -- Name: books books_import_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.books
-    ADD CONSTRAINT books_import_id_fkey FOREIGN KEY (import_id) REFERENCES public.import_logs(import_id);
+    ADD CONSTRAINT books_import_id_fkey FOREIGN KEY (import_id) REFERENCES import_logs(import_id);
 
 
 --
--- TOC entry 3333 (class 2606 OID 32876)
+-- TOC entry 3346 (class 2606 OID 32876)
 -- Name: books books_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.books
-    ADD CONSTRAINT books_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(location_id);
+    ADD CONSTRAINT books_location_id_fkey FOREIGN KEY (location_id) REFERENCES locations(location_id);
 
 
 --
--- TOC entry 3329 (class 2606 OID 32839)
+-- TOC entry 3342 (class 2606 OID 32839)
 -- Name: invoices invoices_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.invoices
-    ADD CONSTRAINT invoices_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.nfc_orders(order_id);
+    ADD CONSTRAINT invoices_order_id_fkey FOREIGN KEY (order_id) REFERENCES nfc_orders(order_id);
 
 
 --
--- TOC entry 3330 (class 2606 OID 32844)
+-- TOC entry 3343 (class 2606 OID 32844)
 -- Name: invoices invoices_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.invoices
-    ADD CONSTRAINT invoices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id);
+    ADD CONSTRAINT invoices_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id);
 
 
 --
--- TOC entry 3328 (class 2606 OID 32823)
+-- TOC entry 3341 (class 2606 OID 32823)
 -- Name: nfc_orders nfc_orders_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.nfc_orders
-    ADD CONSTRAINT nfc_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id);
+    ADD CONSTRAINT nfc_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id);
 
 
 --
--- TOC entry 3338 (class 2606 OID 32936)
+-- TOC entry 3351 (class 2606 OID 32936)
 -- Name: recommendations recommendations_recommended_book_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.recommendations
-    ADD CONSTRAINT recommendations_recommended_book_id_fkey FOREIGN KEY (recommended_book_id) REFERENCES public.books(book_id);
+    ADD CONSTRAINT recommendations_recommended_book_id_fkey FOREIGN KEY (recommended_book_id) REFERENCES books(book_id);
 
 
 --
--- TOC entry 3339 (class 2606 OID 32931)
+-- TOC entry 3352 (class 2606 OID 32931)
 -- Name: recommendations recommendations_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.recommendations
-    ADD CONSTRAINT recommendations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id);
+    ADD CONSTRAINT recommendations_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id);
 
 
 --
--- TOC entry 3334 (class 2606 OID 32902)
+-- TOC entry 3347 (class 2606 OID 32902)
 -- Name: transactions transactions_book_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.transactions
-    ADD CONSTRAINT transactions_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.books(book_id);
+    ADD CONSTRAINT transactions_book_id_fkey FOREIGN KEY (book_id) REFERENCES books(book_id);
 
 
 --
--- TOC entry 3335 (class 2606 OID 32897)
+-- TOC entry 3348 (class 2606 OID 32897)
 -- Name: transactions transactions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.transactions
-    ADD CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id);
+    ADD CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id);
 
 
 --
--- TOC entry 3336 (class 2606 OID 32920)
+-- TOC entry 3349 (class 2606 OID 32920)
 -- Name: wallet_transactions wallet_transactions_reference_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.wallet_transactions
-    ADD CONSTRAINT wallet_transactions_reference_id_fkey FOREIGN KEY (reference_id) REFERENCES public.transactions(transaction_id);
+    ADD CONSTRAINT wallet_transactions_reference_id_fkey FOREIGN KEY (reference_id) REFERENCES transactions(transaction_id);
 
 
 --
--- TOC entry 3337 (class 2606 OID 32915)
+-- TOC entry 3350 (class 2606 OID 32915)
 -- Name: wallet_transactions wallet_transactions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: neondb_owner
 --
 
 ALTER TABLE ONLY public.wallet_transactions
-    ADD CONSTRAINT wallet_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id);
+    ADD CONSTRAINT wallet_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id);
 
 
 --
--- TOC entry 2097 (class 826 OID 16394)
+-- TOC entry 2103 (class 826 OID 16394)
 -- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
 --
 
@@ -983,18 +1103,18 @@ ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON SEQU
 
 
 --
--- TOC entry 2096 (class 826 OID 16393)
+-- TOC entry 2102 (class 826 OID 16393)
 -- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: cloud_admin
 --
 
 ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin IN SCHEMA public GRANT ALL ON TABLES TO neon_superuser WITH GRANT OPTION;
 
 
--- Completed on 2026-04-21 21:25:15
+-- Completed on 2026-04-27 19:22:18
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IYMXEcsCui55QPWfsYgsp0KdUvmijdoRFGqK7yHVVGYYao9NK0IsXuDgZ3qUl6b
+\unrestrict l7eUORHb2BX34JJhEzXkTmxkwbxhhZyOKq3DDks6tVhpjXTBCRBgSzQSZA6ARpd
 

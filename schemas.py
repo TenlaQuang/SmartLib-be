@@ -71,12 +71,41 @@ class RegistrationRequestCreate(BaseModel):
     phone_number: Optional[str] = None
     address: Optional[str] = None
     email: Optional[str] = None
-
+    invoice_image_url: Optional[str] = None
 class RegistrationRequestResponse(BaseModel):
     request_id: int
     user_code: str
     full_name: str
     request_status: str
+    invoice_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+# --- User Schemas ---
+class UserBase(BaseModel):
+    user_code: str
+    full_name: str
+    gender: Optional[str] = None
+    birth_year: Optional[int] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    nfc_tag_id: Optional[str] = None
+    user_type: Optional[str] = "student"
+    status: Optional[str] = "active"
+
+class UserCreate(UserBase):
+    pass
+
+class UserResponse(UserBase):
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+class RegistrationApprove(BaseModel):
+    nfc_serial: str
+
+class RegistrationReject(BaseModel):
+    reason: str
