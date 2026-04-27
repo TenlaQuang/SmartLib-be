@@ -63,6 +63,9 @@ class BookResponse(BookBase):
         from_attributes = True
 
 # --- Registration Schemas ---
+class PayosLinkCreate(BaseModel):
+    user_code: str
+
 class RegistrationRequestCreate(BaseModel):
     user_code: str
     full_name: str
@@ -72,6 +75,8 @@ class RegistrationRequestCreate(BaseModel):
     address: Optional[str] = None
     email: Optional[str] = None
     invoice_image_url: Optional[str] = None
+    payos_order_code: Optional[int] = None
+
 class RegistrationRequestResponse(BaseModel):
     request_id: int
     user_code: str
@@ -83,6 +88,7 @@ class RegistrationRequestResponse(BaseModel):
     address: Optional[str] = None
     email: Optional[str] = None
     invoice_image_url: Optional[str] = None
+    payos_order_code: Optional[int] = None
     checkoutUrl: Optional[str] = None
 
     class Config:

@@ -268,6 +268,29 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
 # ==============================================================================
 # Registration & PayOS Payment
 # ==============================================================================
+@app.post("/api/create-payment-link")
+def create_payment_link(payload: schemas.PayosLinkCreate):
+    """Tạo link thanh toán PayOS mà chưa lưu thông tin đăng ký vào DB."""
+    order_code = int(f"{int(time.time())}") 
+    try:
+        payment_request = CreatePaymentLinkRequest(
+            order_code=order_code,
+            amount=CARD_FEE,
+            description=f"DK {payload.user_code}"[:25],
+            items=[ItemData(name=f"SmartLib {payload.user_code}", quantity=1, price=CARD_FEE)],
+            return_url=f"{BACKEND_URL}/payment-success",
+            cancel_url=f"{BACKEND_URL}/payment-success",
+        )
+        payos_response = payos_client.payment_requests.create(payment_request)
+        return {
+            "order_code": order_code,
+            "checkoutUrl": payos_response.checkout_url
+        }
+    except Exception as payos_err:
+        print(f"PayOS Error: {str(payos_err)}")
+        raise HTTPException(status_code=400, detail=f"Lỗi kết nối PayOS: {str(payos_err)}. Hãy kiểm tra Client ID/API Key trên Render!")
+
+
 @app.post("/api/register", response_model=schemas.RegistrationRequestResponse)
 def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depends(get_db)):
     # 1. Kiểm tra trùng lặp
@@ -277,42 +300,15 @@ def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depen
     if existing:
         raise HTTPException(status_code=400, detail="Mã sinh viên này đã đăng ký rồi!")
 
-    # 2. Lưu vào DB
+    # 2. Lưu vào DB (Kèm theo ảnh bill và mã đơn hàng đã thanh toán)
     try:
         new_req = models.RegistrationRequest(**req_in.model_dump())
         db.add(new_req)
         db.commit()
         db.refresh(new_req)
 
-        # Tạo mã đơn hàng duy nhất cho PayOS
-        order_code = int(f"{int(time.time())}") 
-        new_req.payos_order_code = order_code
-        db.commit()
-
-        # 3. Gọi PayOS (Đây là đoạn dễ lỗi nhất nếu thiếu Environment Variables)
-        try:
-            payment_request = CreatePaymentLinkRequest(
-                order_code=order_code,
-                amount=CARD_FEE,
-                description=f"DK {new_req.user_code}"[:25],
-                items=[ItemData(name=f"SmartLib {new_req.user_code}", quantity=1, price=CARD_FEE)],
-                return_url=f"{BACKEND_URL}/payment-success",
-                cancel_url=f"{BACKEND_URL}/payment-success",
-            )
-            payos_response = payos_client.payment_requests.create(payment_request)
-            
-            # Trả về kết quả
-            return {
-                "request_id": new_req.request_id,
-                "user_code": new_req.user_code,
-                "full_name": new_req.full_name,
-                "request_status": new_req.request_status,
-                "checkoutUrl": payos_response.checkout_url
-            }
-        except Exception as payos_err:
-            # Nếu PayOS lỗi, chúng ta vẫn trả về 200 nhưng kèm thông báo lỗi để debug
-            print(f"PayOS Error: {str(payos_err)}")
-            raise HTTPException(status_code=400, detail=f"Lỗi kết nối PayOS: {str(payos_err)}. Hãy kiểm tra Client ID/API Key trên Render!")
+        # Trả về kết quả
+        return new_req
 
     except Exception as db_err:
         db.rollback()
