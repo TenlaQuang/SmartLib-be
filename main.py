@@ -462,3 +462,30 @@ def reject_registration_request(request_id: int, payload: schemas.RegistrationRe
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.post("/api/users/{user_id}/reissue-nfc")
+def reissue_nfc_card(user_id: int, payload: schemas.NFCReissue, db: Session = Depends(get_db)):
+    """Cấp lại thẻ NFC mới cho người dùng đã tồn tại."""
+    user = _get_or_404(db, models.User, models.User.user_id, user_id, "người dùng")
+    
+    # Kiểm tra xem thẻ mới có bị trùng không
+    existing_nfc = db.query(models.User).filter(models.User.nfc_tag_id == payload.new_nfc_serial).first()
+    if existing_nfc:
+        raise HTTPException(status_code=400, detail="Thẻ NFC này đã được sử dụng bởi người dùng khác.")
+        
+    try:
+        user.nfc_tag_id = payload.new_nfc_serial
+        db.commit()
+        
+        if user.email:
+            body = (f"Chào {user.full_name},\n\n"
+                    f"Yêu cầu cấp lại mã thẻ NFC của bạn đã thành công.\n"
+                    f"Mã số nhận diện mới của bạn là: {payload.new_nfc_serial}.\n\n"
+                    f"Trân trọng,\nBan Quản Trị Thư Viện.")
+            send_email_notification(user.email, "Thông Báo Cấp Lại Mã Thẻ Thư Viện", body)
+            
+        return {"message": "Đã cấp lại mã NFC vào thẻ mới thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

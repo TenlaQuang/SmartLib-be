@@ -121,3 +121,7 @@ class RegistrationApprove(BaseModel):
 
 class RegistrationReject(BaseModel):
     reason: str
+
+class NFCReissue(BaseModel):
+    new_nfc_serial: str
+
