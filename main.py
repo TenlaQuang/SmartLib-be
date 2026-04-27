@@ -69,6 +69,34 @@ async def add_cors_header(request, call_next):
     response.headers["Access-Control-Allow-Headers"] = "*"
     return response
 
+
+import smtplib
+from email.mime.text import MIMEText
+
+# ==============================================================================
+# Email Helper
+# ==============================================================================
+def send_email_notification(to_email: str, subject: str, body: str):
+    """
+    Guil email thong bao toi sinh vien khi phe duyet hoac tu choi.
+    """
+    sender_email = os.getenv("SMTP_EMAIL")
+    sender_password = os.getenv("SMTP_PASSWORD")
+    if not sender_email or not sender_password:
+        return
+        
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = sender_email
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"SMTP Error: {e}")
+
 # ==============================================================================
 # Utility helpers
 # ==============================================================================
@@ -354,3 +382,87 @@ def payment_success_page():
   </div>
 </body>
 </html>"""
+
+
+# ==============================================================================
+# Users & Registration Approval
+# ==============================================================================
+@app.get("/api/users", response_model=List[schemas.UserResponse])
+def get_users(db: Session = Depends(get_db)):
+    """Lấy danh sách tất cả người dùng chính thức."""
+    return db.query(models.User).all()
+
+@app.get("/api/registration-requests", response_model=List[schemas.RegistrationRequestResponse])
+def get_registration_requests(db: Session = Depends(get_db)):
+    """Lấy danh sách đơn đăng ký chờ duyệt."""
+    return db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.request_status == 'pending'
+    ).all()
+
+@app.post("/api/registration-requests/{request_id}/approve")
+def approve_registration_request(request_id: int, payload: schemas.RegistrationApprove, db: Session = Depends(get_db)):
+    """Phê duyệt đơn và gắn NFC serial cho User mới."""
+    req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký.")
+    if req.request_status != "pending":
+        raise HTTPException(status_code=400, detail="Đơn này đã được xử lý.")
+        
+    existing_nfc = db.query(models.User).filter(models.User.nfc_tag_id == payload.nfc_serial).first()
+    if existing_nfc:
+        raise HTTPException(status_code=400, detail="Thẻ NFC này đã được gán cho một người dùng khác.")
+        
+    try:
+        req.request_status = "approved"
+        new_user = models.User(
+            user_code=req.user_code,
+            full_name=req.full_name,
+            gender=req.gender,
+            birth_year=req.birth_year,
+            phone_number=req.phone_number,
+            address=req.address,
+            email=req.email,
+            nfc_tag_id=payload.nfc_serial,
+            status="active"
+        )
+        db.add(new_user)
+        db.commit()
+        
+        if req.email:
+            body = (f"Chào {req.full_name},\n\n"
+                    f"Đơn đăng ký của bạn ĐÃ ĐƯỢC DUYỆT.\n"
+                    f"Thẻ của bạn gắn mã NFC: {payload.nfc_serial}.\n\n"
+                    f"Trân trọng,\nBan Quản Trị Thư Viện.")
+            send_email_notification(req.email, "Thông Báo Duyệt NFC Thư Viện", body)
+            
+        return {"message": "Đã phê duyệt và khởi tạo tài khoản thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/registration-requests/{request_id}/reject")
+def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, db: Session = Depends(get_db)):
+    """Từ chối đơn và gửi lý do cho sinh viên."""
+    req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn đăng ký.")
+    if req.request_status != "pending":
+        raise HTTPException(status_code=400, detail="Đơn này đã được xử lý.")
+        
+    try:
+        req.request_status = "rejected"
+        db.commit()
+        
+        if req.email:
+            body = (f"Chào {req.full_name},\n\n"
+                    f"Đơn đăng ký của bạn TỪ CHỐI.\n"
+                    f"Lý do: {payload.reason}\n\n"
+                    f"Vui lòng liên hệ thủ thư.\n"
+                    f"Trân trọng,")
+            send_email_notification(req.email, "Thông Báo Từ Chối Thư Viện", body)
+            
+        return {"message": "Đã từ chối đơn thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -77,6 +77,12 @@ class RegistrationRequestResponse(BaseModel):
     user_code: str
     full_name: str
     request_status: str
+    gender: Optional[str] = None
+    birth_year: Optional[int] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    invoice_image_url: Optional[str] = None
     checkoutUrl: Optional[str] = None
 
     class Config:
