@@ -40,7 +40,7 @@ payos_client = PayOS(
 )
 
 BACKEND_URL = os.getenv("BACKEND_URL", "https://smartlib-be.onrender.com")
-CARD_FEE = int(os.getenv("CARD_FEE", "50000"))  # Phí làm thẻ (VND)
+CARD_FEE = int(os.getenv("CARD_FEE", "10000"))  # Phí làm thẻ (VND)
 
 # ==============================================================================
 # Khởi tạo ứng dụng
