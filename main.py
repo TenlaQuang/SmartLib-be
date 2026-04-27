@@ -14,7 +14,8 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from payos import ItemData, PaymentData, PayOS
+from payos import PayOS
+from payos.types import CreatePaymentLinkRequest, ItemData
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -46,8 +47,11 @@ CARD_FEE = int(os.getenv("CARD_FEE", "50000"))  # Phí làm thẻ (VND)
 # ==============================================================================
 app = FastAPI(title="SmartLib API", version="2.0.0")
 
-os.makedirs("static/images", exist_ok=True)
+# Tạo thư mục static nếu chưa có (cần thiết trên Render)
+static_dir = "static/images"
+os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -247,19 +251,19 @@ def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depen
         new_req.payos_order_code = order_code
         db.commit()
 
-        # Tạo link thanh toán PayOS
-        payment_data = PaymentData(
-            orderCode=order_code,
+        # Tạo link thanh toán PayOS (v1.1.0 API)
+        payment_request = CreatePaymentLinkRequest(
+            order_code=order_code,
             amount=CARD_FEE,
             description=f"DK {new_req.user_code}"[:25],
             items=[ItemData(name=f"The SmartLib - {new_req.user_code}", quantity=1, price=CARD_FEE)],
-            returnUrl=f"{BACKEND_URL}/payment-success",
-            cancelUrl=f"{BACKEND_URL}/payment-success",
+            return_url=f"{BACKEND_URL}/payment-success",
+            cancel_url=f"{BACKEND_URL}/payment-success",
         )
-        payos_response = payos_client.createPaymentLink(payment_data)
+        payos_response = payos_client.payment_requests.create(payment_request)
 
         result = schemas.RegistrationRequestResponse.model_validate(new_req)
-        result.checkoutUrl = payos_response.checkoutUrl
+        result.checkoutUrl = payos_response.checkout_url
         return result
 
     except HTTPException:
