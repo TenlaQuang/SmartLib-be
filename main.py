@@ -187,6 +187,85 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
     _commit_or_rollback(db)
     return {"message": "Xóa sách thành công", "book_id": book_id}
 
+@app.get("/api/books/title-groups")
+def get_book_title_groups(db: Session = Depends(get_db)):
+    """
+    Trả về danh sách các NHÓM ĐẦU SÁCH (gom theo title + image_url).
+    Mỗi nhóm có: title, image_url, total_copies, copies_on_shelf, copies_waiting, location_info
+    """
+    books = db.query(models.Book).all()
+    
+    groups = {}
+    for book in books:
+        key = book.title
+        if key not in groups:
+            groups[key] = {
+                "title": book.title,
+                "image_url": book.image_url,
+                "total_copies": 0,
+                "copies_waiting": 0,
+                "copies_on_shelf": 0,
+                "locations": {},
+            }
+        groups[key]["total_copies"] += 1
+        if book.location_id is None:
+            groups[key]["copies_waiting"] += 1
+        else:
+            groups[key]["copies_on_shelf"] += 1
+            loc = book.location
+            if loc:
+                loc_label = f"Khu {loc.zone_name} - {loc.shelf_id}"
+                if loc.level_number:
+                    loc_label += f" (Tầng {loc.level_number})"
+                groups[key]["locations"][loc_label] = groups[key]["locations"].get(loc_label, 0) + 1
+
+    result = []
+    for title, g in groups.items():
+        loc_summary = [{"location": k, "count": v} for k, v in g["locations"].items()]
+        result.append({
+            "title": g["title"],
+            "image_url": g["image_url"],
+            "total_copies": g["total_copies"],
+            "copies_waiting": g["copies_waiting"],
+            "copies_on_shelf": g["copies_on_shelf"],
+            "location_summary": loc_summary,
+        })
+    return result
+
+
+@app.post("/api/books/assign-by-title")
+def assign_books_by_title(payload: dict, db: Session = Depends(get_db)):
+    """
+    Xếp kệ TẤT CẢ bản sao đang chờ (location_id=null) của 1 tựa sách vào cùng 1 vị trí.
+    Body: { "title": "...", "location_id": 5 }
+    """
+    title = payload.get("title")
+    location_id = payload.get("location_id")
+    
+    if not title or not location_id:
+        raise HTTPException(status_code=400, detail="Thiếu title hoặc location_id")
+    
+    loc = db.query(models.Location).filter(models.Location.location_id == location_id).first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Không tìm thấy vị trí kệ")
+    
+    waiting_books = db.query(models.Book).filter(
+        models.Book.title == title,
+        models.Book.location_id == None
+    ).all()
+    
+    if not waiting_books:
+        raise HTTPException(status_code=404, detail="Không có bản sao nào đang chờ kệ cho tựa sách này")
+    
+    count = len(waiting_books)
+    for book in waiting_books:
+        book.location_id = location_id
+    
+    db.commit()
+    return {"message": f"Đã xếp {count} bản sao '{title}' lên kệ thành công."}
+
+
+
 
 @app.post("/api/upload-image")
 async def upload_image(file: UploadFile = File(...)):
