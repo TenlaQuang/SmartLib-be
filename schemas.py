@@ -76,6 +76,7 @@ class RegistrationRequestCreate(BaseModel):
     email: Optional[str] = None
     invoice_image_url: Optional[str] = None
     payos_order_code: Optional[int] = None
+    nfc_serial: Optional[str] = None
 
 class RegistrationRequestResponse(BaseModel):
     request_id: int
@@ -89,6 +90,7 @@ class RegistrationRequestResponse(BaseModel):
     email: Optional[str] = None
     invoice_image_url: Optional[str] = None
     payos_order_code: Optional[int] = None
+    nfc_serial: Optional[str] = None
     checkoutUrl: Optional[str] = None
 
     class Config:
@@ -142,3 +144,6 @@ class NfcTagResponse(BaseModel):
 
 class RegistrationApproveWithTag(BaseModel):
     tag_id: int
+
+class AssignNFC(BaseModel):
+    nfc_serial: str

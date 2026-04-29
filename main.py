@@ -383,30 +383,7 @@ def payment_success_page():
 # ==============================================================================
 
 # ==============================================================================
-# NFC Inventory
-# ==============================================================================
-@app.get("/api/nfc-inventory", response_model=List[schemas.NfcTagResponse])
-def get_all_nfc_tags(db: Session = Depends(get_db)):
-    return db.query(models.NfcTag).order_by(models.NfcTag.tag_id.desc()).all()
 
-@app.get("/api/nfc-inventory/available", response_model=List[schemas.NfcTagResponse])
-def get_available_nfc_tags(db: Session = Depends(get_db)):
-    return db.query(models.NfcTag).filter(models.NfcTag.status == "available").all()
-
-@app.post("/api/nfc-inventory", response_model=schemas.NfcTagResponse)
-def add_nfc_tag(payload: schemas.NfcTagCreate, db: Session = Depends(get_db)):
-    existing = db.query(models.NfcTag).filter(models.NfcTag.nfc_serial == payload.nfc_serial).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Mã lệnh NFC này đã có trong hệ thống.")
-    new_tag = models.NfcTag(
-        nfc_serial=payload.nfc_serial,
-        label=payload.label,
-        status="available"
-    )
-    db.add(new_tag)
-    db.commit()
-    db.refresh(new_tag)
-    return new_tag
 
 # Users & Registration Approval
 # ==============================================================================
@@ -423,21 +400,19 @@ def get_registration_requests(db: Session = Depends(get_db)):
     ).all()
 
 @app.post("/api/registration-requests/{request_id}/approve")
-def approve_registration_request(request_id: int, payload: schemas.RegistrationApproveWithTag, db: Session = Depends(get_db)):
-    """Phê duyệt và gán thẻ có sẵn từ NFC Inventory."""
+def approve_registration_request(request_id: int, db: Session = Depends(get_db)):
+    """Phê duyệt đơn đăng ký."""
     req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn.")
     if req.request_status != "pending":
         raise HTTPException(status_code=400, detail="Đơn đã xử lý.")
         
-    tag = db.query(models.NfcTag).filter(models.NfcTag.tag_id == payload.tag_id, models.NfcTag.status == "available").first()
-    if not tag:
-        raise HTTPException(status_code=400, detail="Thẻ NFC không hợp lệ hoặc đã bị gán.")
-        
     try:
         req.request_status = "approved"
-        tag.status = "assigned"
+        
+        has_nfc = bool(req.nfc_serial)
+        user_status = "active" if has_nfc else "pending_nfc"
 
         new_user = models.User(
             user_code=req.user_code,
@@ -447,20 +422,35 @@ def approve_registration_request(request_id: int, payload: schemas.RegistrationA
             phone_number=req.phone_number,
             address=req.address,
             email=req.email,
-            nfc_tag_id=tag.nfc_serial,
-            status="active"
+            nfc_tag_id=req.nfc_serial if has_nfc else None,
+            status=user_status
         )
         db.add(new_user)
         db.commit()
 
         if req.email:
-            body = (f"Chào {req.full_name},\n\n"
-                    f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.\n"
-                    f"Mã số của thẻ vật lý được cấp phát cho bạn là: {tag.label}.\n"
-                    f"Vui lòng đến quầy nhận.\n\nTrân trọng.")
-            send_email_notification(req.email, "Thẻ Thư viện Sẵn sàng", body)
+            if has_nfc:
+                body = (f"Chào {req.full_name},
 
-        return {"message": "Đã duyệt và gán thẻ thành công"}
+"
+                        f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.
+"
+                        f"Thẻ vật lý của bạn đã được liên kết với hệ thống.
+"
+                        f"Trân trọng.")
+                send_email_notification(req.email, "Đăng ký thành công", body)
+            else:
+                body = (f"Chào {req.full_name},
+
+"
+                        f"Đơn đăng ký thẻ SmartLib của bạn đã được duyệt!
+"
+                        f"Tuy nhiên, bạn chưa có thẻ NFC. Vui lòng đến thư viện trong thời gian sớm nhất để được cấp thẻ vật lý và liên kết tài khoản.
+"
+                        f"Trân trọng.")
+                send_email_notification(req.email, "Đăng ký thành công - Vui lòng nhận thẻ", body)
+
+        return {"message": "Đã duyệt thành công"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -519,4 +509,53 @@ def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, 
         return {"message": "Đã cấp lại thành công thẻ từ kho"}
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/users/{user_id}/assign-nfc")
+def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, db: Session = Depends(get_db)):
+    """Gán mã NFC thẻ trắng cho người dùng chưa có thẻ."""
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy user")
+        
+    existing_nfc = db.query(models.User).filter(models.User.nfc_tag_id == payload.nfc_serial).first()
+    if existing_nfc:
+        raise HTTPException(status_code=400, detail="Thẻ NFC này đã được sử dụng bởi người khác.")
+        
+    try:
+        user.nfc_tag_id = payload.nfc_serial
+        user.status = "active"
+        db.commit()
+        
+        if user.email:
+            body = (f"Chào {user.full_name},\n\n"
+                    f"Tài khoản SmartLib của bạn đã được liên kết thành công với thẻ vật lý NFC.\n"
+                    f"Bạn đã có thể sử dụng đầy đủ các dịch vụ mượn sách.\n"
+                    f"Trân trọng.")
+            send_email_notification(user.email, "Kích hoạt Thẻ NFC Thành Công", body)
+            
+        return {"message": "Đã gán thẻ thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/users/{user_id}/remind-nfc")
+def remind_nfc_pickup(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy user")
+        
+    if user.status != "pending_nfc":
+        raise HTTPException(status_code=400, detail="User này đã có thẻ.")
+        
+    try:
+        if user.email:
+            body = (f"Chào {user.full_name},\n\n"
+                    f"Đây là lời nhắc nhở từ thư viện.\n"
+                    f"Tài khoản SmartLib của bạn đã được duyệt nhưng bạn vẫn CHƯA đến nhận thẻ vật lý.\n"
+                    f"Vui lòng đến quầy thủ thư để nhận thẻ và kích hoạt dịch vụ.\n\n"
+                    f"Trân trọng.")
+            send_email_notification(user.email, "Nhắc nhở: Lên nhận thẻ thư viện", body)
+            
+        return {"message": "Đã gửi email nhắc nhở"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

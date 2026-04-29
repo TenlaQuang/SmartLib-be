@@ -73,6 +73,7 @@ class RegistrationRequest(Base):
     address = Column(Text, nullable=True)
     email = Column(String(100), nullable=True)
     invoice_image_url = Column(String(500), nullable=True)
+    nfc_serial = Column(String(100), nullable=True)
     request_status = Column(String(20), default="pending")
     payment_status = Column(String(20), default="pending")
     payos_order_code = Column(BigInteger, unique=True, nullable=True)
