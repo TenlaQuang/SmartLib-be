@@ -3,36 +3,28 @@ import requests
 import json
 
 def send_html_email(to_email: str, subject: str, html_content: str, text_content: str = ""):
-    """Gửi email qua Brevo API (Khắc phục hoàn toàn lỗi chặn SMTP và lỗi giới hạn domain của Resend)."""
-    api_key = os.getenv("BREVO_API_KEY")
-    sender_email = os.getenv("SMTP_EMAIL", "smartlibv1.1@gmail.com")
+    """Gửi email qua Google Apps Script Proxy (Giải pháp tối ưu cho Render Free)."""
+    script_url = os.getenv("GOOGLE_SCRIPT_URL")
     
-    if not api_key:
-        print("Bỏ qua gửi mail: Chưa cấu hình BREVO_API_KEY")
+    if not script_url:
+        print("Bỏ qua gửi mail: Chưa cấu hình GOOGLE_SCRIPT_URL")
         return
 
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": api_key,
-        "content-type": "application/json"
-    }
-    
     payload = {
-        "sender": {"name": "SmartLib System", "email": sender_email},
-        "to": [{"email": to_email}],
+        "to": to_email,
         "subject": subject,
-        "htmlContent": html_content
+        "html": html_content
     }
 
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        if response.status_code in [200, 201]:
-            print(f"Đã gửi mail thành công qua Brevo tới: {to_email}")
+        # Gửi request POST đến Google Script
+        response = requests.post(script_url, data=json.dumps(payload))
+        if response.text == "Success":
+            print(f"Đã gửi mail thành công qua Google Script tới: {to_email}")
         else:
-            print(f"Lỗi Brevo API ({response.status_code}): {response.text}")
+            print(f"Phản hồi từ Google Script: {response.text}")
     except Exception as e:
-        print(f"Lỗi kết nối Brevo: {e}")
+        print(f"Lỗi kết nối Google Script: {e}")
 
 def get_approval_template(full_name: str, has_nfc: bool):
     """Template HTML cho việc duyệt đơn."""
