@@ -1,29 +1,38 @@
 import os
-import resend
+import requests
+import json
 
 def send_html_email(to_email: str, subject: str, html_content: str, text_content: str = ""):
-    """Gửi email định dạng HTML chuyên nghiệp qua Resend API (Khắc phục lỗi Render chặn SMTP)."""
-    api_key = os.getenv("RESEND_API_KEY")
+    """Gửi email qua Brevo API (Khắc phục hoàn toàn lỗi chặn SMTP và lỗi giới hạn domain của Resend)."""
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("SMTP_EMAIL", "smartlibv1.1@gmail.com")
     
     if not api_key:
-        print("Bỏ qua gửi mail: Chưa cấu hình RESEND_API_KEY trong Environment")
+        print("Bỏ qua gửi mail: Chưa cấu hình BREVO_API_KEY")
         return
 
-    resend.api_key = api_key
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+    
+    payload = {
+        "sender": {"name": "SmartLib System", "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content
+    }
 
     try:
-        # Nếu dùng bản miễn phí Resend, email gửi đi phải là onboarding@resend.dev
-        params = {
-            "from": "SmartLib System <onboarding@resend.dev>",
-            "to": [to_email],
-            "subject": subject,
-            "html": html_content,
-        }
-
-        r = resend.Emails.send(params)
-        print(f"Đã gửi mail thành công qua Resend tới: {to_email} (ID: {r.id})")
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        if response.status_code in [200, 201]:
+            print(f"Đã gửi mail thành công qua Brevo tới: {to_email}")
+        else:
+            print(f"Lỗi Brevo API ({response.status_code}): {response.text}")
     except Exception as e:
-        print(f"Lỗi Resend API: {e}")
+        print(f"Lỗi kết nối Brevo: {e}")
 
 def get_approval_template(full_name: str, has_nfc: bool):
     """Template HTML cho việc duyệt đơn."""
