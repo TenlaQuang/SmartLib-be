@@ -143,13 +143,7 @@ def read_root():
 def test_db(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
-        db_url = os.getenv("DATABASE_URL", "NOT_FOUND")
-        masked_url = db_url[:20] + "..." + db_url[-20:] if len(db_url) > 40 else "URL_TOO_SHORT"
-        return {
-            "status": "ok", 
-            "message": "Kết nối Database thành công!",
-            "db_info": masked_url
-        }
+        return {"status": "ok", "message": "Kết nối Database thành công!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -463,8 +457,6 @@ def get_registration_requests(db: Session = Depends(get_db)):
         models.RegistrationRequest.request_status == 'pending'
     ).all()
 
-import traceback
-
 @app.post("/api/registration-requests/{request_id}/approve")
 def approve_registration_request(request_id: int, db: Session = Depends(get_db)):
     """Phê duyệt đơn đăng ký."""
@@ -475,38 +467,32 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Đơn đã xử lý.")
         
     try:
-        # Sử dụng raw SQL để insert và update để loại trừ lỗi ORM
-        from sqlalchemy import text
+        req.request_status = "approved"
         
-        # 1. Kiểm tra tồn tại
-        check_sql = text("SELECT 1 FROM users WHERE user_code = :code")
-        if db.execute(check_sql, {"code": req.user_code}).fetchone():
-             raise Exception(f"Mã sinh viên {req.user_code} ĐÃ TỒN TẠI trong database (Raw SQL Check)")
+        # Kiểm tra tồn tại để bảo vệ
+        existing_user = db.query(models.User).filter(models.User.user_code == req.user_code).first()
+        if existing_user:
+             raise HTTPException(status_code=400, detail=f"Mã sinh viên {req.user_code} đã tồn tại trong hệ thống.")
 
-        # 2. Insert User
-        insert_sql = text("""
-            INSERT INTO users (user_code, full_name, gender, birth_year, phone_number, address, email, nfc_tag_id, status)
-            VALUES (:code, :name, :gender, :birth, :phone, :addr, :email, :nfc, :status)
-        """)
-        db.execute(insert_sql, {
-            "code": req.user_code,
-            "name": req.full_name,
-            "gender": req.gender,
-            "birth": req.birth_year,
-            "phone": req.phone_number,
-            "addr": req.address,
-            "email": req.email,
-            "nfc": req.nfc_serial if bool(req.nfc_serial) else None,
-            "status": "active" if bool(req.nfc_serial) else "pending_nfc"
-        })
-        
-        # 3. Update Request
-        update_sql = text("UPDATE registration_requests SET request_status = 'approved' WHERE request_id = :rid")
-        db.execute(update_sql, {"rid": request_id})
-        
+        has_nfc = bool(req.nfc_serial)
+        user_status = "active" if has_nfc else "pending_nfc"
+
+        new_user = models.User(
+            user_code=req.user_code,
+            full_name=req.full_name,
+            gender=req.gender,
+            birth_year=req.birth_year,
+            phone_number=req.phone_number,
+            address=req.address,
+            email=req.email,
+            nfc_tag_id=req.nfc_serial if has_nfc else None,
+            status=user_status
+        )
+        db.add(new_user)
         db.commit()
 
         if req.email:
+            # Gửi mail thông báo...
             if has_nfc:
                 body = (f"Chào {req.full_name},\n\n"
                         f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.\n"
@@ -523,9 +509,8 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         return {"message": "Đã duyệt thành công"}
     except Exception as e:
         db.rollback()
-        print("LỖI DUYỆT ĐƠN:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
+        print(f"Lỗi duyệt đơn: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/registration-requests/{request_id}/reject")
 def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, db: Session = Depends(get_db)):
