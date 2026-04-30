@@ -136,7 +136,7 @@ def _commit_or_rollback(db: Session):
 # ==============================================================================
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
-    return {"message": "SmartLib API v2.1 - Online", "status": "ok"}
+    return {"message": "SmartLib API v2.1.2 - Online", "status": "ok"}
 
 @app.post("/api/admin/wipe-all-data-secret-123456")
 def wipe_data(db: Session = Depends(get_db)):
