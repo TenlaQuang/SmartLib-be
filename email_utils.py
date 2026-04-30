@@ -137,3 +137,23 @@ def get_reissue_nfc_template(full_name: str, nfc_tag_id: str):
     </body>
     </html>
     """
+
+def get_lock_nfc_template(full_name: str):
+    """Template HTML cho việc khóa thẻ NFC."""
+    return f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #d32f2f; text-align: center;">Thông báo: Khóa thẻ SmartLib</h2>
+            <p>Chào <strong>{full_name}</strong>,</p>
+            <p>Thẻ thư viện SmartLib của bạn vừa được hệ thống <strong>tạm khóa</strong> theo yêu cầu hoặc do phát hiện bất thường.</p>
+            <div style="background-color: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>Trạng thái:</strong> Thẻ của bạn hiện không thể dùng để mượn/trả sách hoặc ra vào thư viện.
+            </div>
+            <p>Nếu bạn bị mất thẻ, vui lòng đến quầy thủ thư để làm thủ tục cấp lại thẻ mới. Nếu đây là một nhầm lẫn, hãy liên hệ ngay với chúng tôi để được hỗ trợ mở khóa.</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="font-size: 12px; color: #888; text-align: center;">SmartLib System</p>
+        </div>
+    </body>
+    </html>
+    """

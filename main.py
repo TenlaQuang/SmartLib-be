@@ -476,7 +476,41 @@ def payment_success_page():
 @app.get("/api/users", response_model=List[schemas.UserResponse])
 def get_users(db: Session = Depends(get_db)):
     """Lấy danh sách tất cả người dùng chính thức."""
-    return db.query(models.User).all()
+    return db.query(models.User).order_by(models.User.created_at.desc()).all()
+
+@app.put("/api/users/{user_id}", response_model=schemas.UserResponse)
+def update_user(user_id: int, payload: schemas.UserUpdate, db: Session = Depends(get_db)):
+    """Cập nhật thông tin người dùng."""
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(user, key, value)
+    
+    try:
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """Xóa người dùng (Lưu ý: Chỉ nên xóa nếu không có ràng buộc mượn trả)."""
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+    
+    try:
+        db.delete(user)
+        db.commit()
+        return {"message": "Đã xóa người dùng thành công."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Không thể xóa người dùng này (có thể do ràng buộc dữ liệu).")
 
 @app.get("/api/users/check/{user_code}")
 def check_user_for_nfc(user_code: str, db: Session = Depends(get_db)):
@@ -643,4 +677,29 @@ def remind_nfc_pickup(user_id: int, background_tasks: BackgroundTasks, db: Sessi
             
         return {"message": "Đã gửi email nhắc nhở"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/users/{user_id}/lock-nfc")
+def lock_user_nfc(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Khóa thẻ NFC từ xa (Dùng khi mất thẻ)."""
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+    
+    if not user.nfc_tag_id:
+        raise HTTPException(status_code=400, detail="Người dùng này chưa có thẻ để khóa.")
+    
+    try:
+        # Lưu lại mã thẻ cũ vào log nếu cần, ở đây ta chỉ cần đổi trạng thái
+        user.status = "locked"
+        # Ta không xóa nfc_tag_id ngay để biết thẻ nào bị khóa, nhưng status locked sẽ chặn mượn trả
+        db.commit()
+        
+        if user.email:
+            html = email_utils.get_lock_nfc_template(user.full_name)
+            background_tasks.add_task(email_utils.send_html_email, user.email, "Cảnh báo: Thẻ SmartLib của bạn đã bị khóa", html)
+            
+        return {"message": "Đã khóa thẻ thành công"}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

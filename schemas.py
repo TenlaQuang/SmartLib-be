@@ -118,6 +118,16 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    gender: Optional[str] = None
+    birth_year: Optional[int] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    status: Optional[str] = None
+    user_type: Optional[str] = None
+
 class RegistrationApprove(BaseModel):
     nfc_serial: str
 
