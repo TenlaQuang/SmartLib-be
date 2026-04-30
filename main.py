@@ -10,7 +10,7 @@ from typing import List
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -350,27 +350,49 @@ def create_payment_link(payload: schemas.PayosLinkCreate):
         raise HTTPException(status_code=400, detail=f"Lỗi kết nối PayOS: {str(payos_err)}. Hãy kiểm tra Client ID/API Key trên Render!")
 
 
-@app.post("/api/register", response_model=schemas.RegistrationRequestResponse)
-def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depends(get_db)):
+@app.post("/api/register")
+async def register_user(
+    background_tasks: BackgroundTasks,
+    user_code: str = Form(...),
+    full_name: str = Form(...),
+    gender: str = Form(...),
+    birth_year: int = Form(...),
+    phone_number: str = Form(...),
+    address: str = Form(...),
+    email: str = Form(...),
+    nfc_serial: str = Form(None),
+    invoice_image: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
     # 1. Kiểm tra trùng lặp
     existing = db.query(models.RegistrationRequest).filter(
-        models.RegistrationRequest.user_code == req_in.user_code
+        models.RegistrationRequest.user_code == user_code
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Mã sinh viên này đã đăng ký rồi!")
 
     # 2. Lưu vào DB (Kèm theo ảnh bill và mã đơn hàng đã thanh toán)
     try:
-        new_req = models.RegistrationRequest(**req_in.model_dump())
+        # Upload ảnh hóa đơn
+        image_url = None
+        if invoice_image:
+            img_res = cloudinary.uploader.upload(await invoice_image.read(), folder="smartlib_invoices")
+            image_url = img_res.get("secure_url")
+
+        new_req = models.RegistrationRequest(
+            user_code=user_code, full_name=full_name, gender=gender,
+            birth_year=birth_year, phone_number=phone_number, address=address,
+            email=email, nfc_serial=nfc_serial, invoice_image=image_url
+        )
         db.add(new_req)
         db.commit()
-        # Gửi email thông báo đã nhận đơn
-        if new_req.email:
-            html = email_utils.get_new_request_template(new_req.full_name, new_req.user_code)
-            email_utils.send_html_email(new_req.email, "SmartLib - Đã nhận đơn đăng ký", html)
+        # Gửi email thông báo đã nhận đơn (Chạy ngầm)
+        if email:
+            html = email_utils.get_new_request_template(full_name, user_code)
+            background_tasks.add_task(email_utils.send_html_email, email, "SmartLib - Đã nhận đơn đăng ký", html)
 
         # Trả về kết quả
-        return new_req
+        return {"message": "Đăng ký thành công, vui lòng chờ thủ thư duyệt đơn."}
 
     except Exception as db_err:
         db.rollback()
@@ -486,7 +508,7 @@ def get_registration_requests(db: Session = Depends(get_db)):
     ).all()
 
 @app.post("/api/registration-requests/{request_id}/approve")
-def approve_registration_request(request_id: int, db: Session = Depends(get_db)):
+def approve_registration_request(request_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Phê duyệt đơn đăng ký."""
     req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
     if not req:
@@ -521,7 +543,7 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
 
         if req.email:
             html = email_utils.get_approval_template(req.full_name, has_nfc)
-            email_utils.send_html_email(req.email, "SmartLib - Duyệt đơn đăng ký thành công", html)
+            background_tasks.add_task(email_utils.send_html_email, req.email, "SmartLib - Duyệt đơn đăng ký thành công", html)
 
         return {"message": "Đã duyệt thành công"}
     except Exception as e:
@@ -530,7 +552,7 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/registration-requests/{request_id}/reject")
-def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, db: Session = Depends(get_db)):
+def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Từ chối đơn và gửi lý do cho sinh viên."""
     req = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_id == request_id).first()
     if not req:
@@ -544,7 +566,7 @@ def reject_registration_request(request_id: int, payload: schemas.RegistrationRe
         
         if req.email:
             html = email_utils.get_rejection_template(req.full_name, payload.reason)
-            email_utils.send_html_email(req.email, "SmartLib - Thông báo kết quả đăng ký", html)
+            background_tasks.add_task(email_utils.send_html_email, req.email, "SmartLib - Thông báo kết quả đăng ký", html)
             
         return {"message": "Đã từ chối đơn thành công"}
     except Exception as e:
@@ -554,7 +576,7 @@ def reject_registration_request(request_id: int, payload: schemas.RegistrationRe
 
 
 @app.post("/api/users/{user_id}/reissue-nfc")
-def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, db: Session = Depends(get_db)):
+def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Cấp lại thẻ NFC mới từ kho chứa."""
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
@@ -571,7 +593,7 @@ def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, 
         
         if user.email:
             html = email_utils.get_reissue_nfc_template(user.full_name, tag.nfc_serial)
-            email_utils.send_html_email(user.email, "SmartLib - Thông báo cấp lại thẻ NFC thành công", html)
+            background_tasks.add_task(email_utils.send_html_email, user.email, "SmartLib - Thông báo cấp lại thẻ NFC thành công", html)
             
         return {"message": "Đã cấp lại thành công thẻ từ kho"}
     except Exception as e:
@@ -579,7 +601,7 @@ def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, 
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/users/{user_id}/assign-nfc")
-def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, db: Session = Depends(get_db)):
+def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Gán mã NFC thẻ trắng cho người dùng chưa có thẻ."""
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
@@ -596,7 +618,7 @@ def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, db: Session = D
         
         if user.email:
             html = email_utils.get_reissue_nfc_template(user.full_name, payload.nfc_serial) # Dùng chung template reissue vì nội dung tương đương
-            email_utils.send_html_email(user.email, "SmartLib - Thẻ của bạn đã được kích hoạt", html)
+            background_tasks.add_task(email_utils.send_html_email, user.email, "SmartLib - Thẻ của bạn đã được kích hoạt", html)
             
         return {"message": "Đã gán thẻ thành công"}
     except Exception as e:
@@ -604,7 +626,7 @@ def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, db: Session = D
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/users/{user_id}/remind-nfc")
-def remind_nfc_pickup(user_id: int, db: Session = Depends(get_db)):
+def remind_nfc_pickup(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy user")
@@ -615,7 +637,7 @@ def remind_nfc_pickup(user_id: int, db: Session = Depends(get_db)):
     try:
         if user.email:
             html = email_utils.get_remind_nfc_template(user.full_name)
-            email_utils.send_html_email(user.email, "Nhắc nhở: Lên nhận thẻ thư viện SmartLib", html)
+            background_tasks.add_task(email_utils.send_html_email, user.email, "Nhắc nhở: Lên nhận thẻ thư viện SmartLib", html)
             
         return {"message": "Đã gửi email nhắc nhở"}
     except Exception as e:
