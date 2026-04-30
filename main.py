@@ -136,7 +136,7 @@ def _commit_or_rollback(db: Session):
 # ==============================================================================
 @app.get("/")
 def read_root():
-    return {"message": "SmartLib API v2.0 - Online"}
+    return {"message": "SmartLib API v2.1 - Online", "status": "ok"}
 
 
 @app.get("/api/test-db")
