@@ -53,34 +53,6 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-from database import engine
-
-@app.on_event("startup")
-def auto_migrate():
-    """Tự động thêm các cột mới vào DB nếu chưa tồn tại."""
-    migrations = [
-        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS nfc_serial VARCHAR(100)",
-        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS invoice_image_url VARCHAR(500)",
-        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'pending'",
-        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS payos_order_code BIGINT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending_nfc'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(15)",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100)",
-        "CREATE TABLE IF NOT EXISTS nfc_inventory (tag_id SERIAL PRIMARY KEY, nfc_serial VARCHAR(100) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, status VARCHAR(20) DEFAULT 'available', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    ]
-    with engine.connect() as conn:
-        for sql in migrations:
-            try:
-                conn.execute(text(sql))
-            except Exception as e:
-                print(f"[Migration skip] {e}")
-        conn.commit()
-    print("[Startup] DB migration done.")
-
-
 @app.middleware("http")
 async def add_cors_header(request, call_next):
     # Xử lý các request OPTIONS (Preflight)
@@ -174,13 +146,6 @@ def test_db(db: Session = Depends(get_db)):
         return {"status": "ok", "message": "Kết nối Database thành công!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
-
-@app.get("/api/debug/users")
-def debug_users(db: Session = Depends(get_db)):
-    """Debug: lấy raw users từ DB."""
-    result = db.execute(text("SELECT user_id, user_code, full_name, status FROM users")).fetchall()
-    return [{"user_id": r[0], "user_code": r[1], "full_name": r[2], "status": r[3]} for r in result]
 
 
 # ==============================================================================
@@ -492,6 +457,8 @@ def get_registration_requests(db: Session = Depends(get_db)):
         models.RegistrationRequest.request_status == 'pending'
     ).all()
 
+import traceback
+
 @app.post("/api/registration-requests/{request_id}/approve")
 def approve_registration_request(request_id: int, db: Session = Depends(get_db)):
     """Phê duyệt đơn đăng ký."""
@@ -506,13 +473,6 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         
         has_nfc = bool(req.nfc_serial)
         user_status = "active" if has_nfc else "pending_nfc"
-
-        # Kiểm tra user_code đã tồn tại chưa (tránh duplicate key)
-        existing_user = db.query(models.User).filter(models.User.user_code == req.user_code).first()
-        if existing_user:
-            # User đã tồn tại, chỉ cập nhật trạng thái đơn
-            db.commit()
-            return {"message": "Tài khoản đã tồn tại, đã cập nhật trạng thái đơn"}
 
         new_user = models.User(
             user_code=req.user_code,
@@ -545,7 +505,9 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         return {"message": "Đã duyệt thành công"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print("LỖI DUYỆT ĐƠN:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
 
 @app.post("/api/registration-requests/{request_id}/reject")
 def reject_registration_request(request_id: int, payload: schemas.RegistrationReject, db: Session = Depends(get_db)):
