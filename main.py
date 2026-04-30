@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from payos import PayOS
 from payos.types import CreatePaymentLinkRequest, ItemData
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -727,18 +727,36 @@ def get_user_activity(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/locations", response_model=List[schemas.LocationWithCount])
 def get_locations(db: Session = Depends(get_db)):
-    """Lấy danh sách các kệ sách (vị trí) và số lượng sách trên mỗi kệ."""
-    locations = db.query(models.Location).all()
+    """Lấy danh sách các kệ sách và thống kê sách độc nhất trên mỗi kệ."""
+    locations = db.query(models.Location).order_by(models.Location.zone_name, models.Location.shelf_id, models.Location.level_number).all()
     result = []
     for loc in locations:
-        count = db.query(models.Book).filter(models.Book.location_id == loc.location_id).count()
+        # Tổng số lượng sách
+        total_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id).count()
+        
+        # Thống kê sách độc nhất (Unique Books)
+        unique_books_query = db.query(
+            models.Book.isbn,
+            models.Book.title,
+            models.Book.image_url,
+            func.count(models.Book.book_id).label("count")
+        ).filter(models.Book.location_id == loc.location_id).group_by(
+            models.Book.isbn, models.Book.title, models.Book.image_url
+        ).all()
+        
+        unique_books = [
+            {"isbn": b.isbn, "title": b.title, "image_url": b.image_url, "count": b.count}
+            for b in unique_books_query
+        ]
+
         result.append({
             "location_id": loc.location_id,
             "zone_name": loc.zone_name,
-            "aisle_number": loc.aisle_number,
             "shelf_id": loc.shelf_id,
             "level_number": loc.level_number,
-            "book_count": count
+            "max_capacity": loc.max_capacity,
+            "book_count": total_count,
+            "unique_books": unique_books
         })
     return result
 

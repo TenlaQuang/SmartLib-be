@@ -14,6 +14,7 @@ class LocationBase(BaseModel):
 class LocationWithCount(LocationBase):
     location_id: int
     book_count: int
+    unique_books: Optional[List[dict]] = []
     
     class Config:
         from_attributes = True
