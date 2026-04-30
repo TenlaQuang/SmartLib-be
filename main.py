@@ -475,30 +475,35 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Đơn đã xử lý.")
         
     try:
-        req.request_status = "approved"
+        # Sử dụng raw SQL để insert và update để loại trừ lỗi ORM
+        from sqlalchemy import text
         
-        # Kiểm tra xem User đã tồn tại chưa để tránh lỗi UniqueViolation
-        existing_user = db.query(models.User).filter(models.User.user_code == req.user_code).first()
-        if existing_user:
-             # Nếu user đã tồn tại, có thể cập nhật thông tin hoặc báo lỗi
-             # Ở đây ta báo lỗi cụ thể để thủ thư biết
-             raise Exception(f"Mã sinh viên {req.user_code} đã tồn tại trong hệ thống người dùng chính thức.")
+        # 1. Kiểm tra tồn tại
+        check_sql = text("SELECT 1 FROM users WHERE user_code = :code")
+        if db.execute(check_sql, {"code": req.user_code}).fetchone():
+             raise Exception(f"Mã sinh viên {req.user_code} ĐÃ TỒN TẠI trong database (Raw SQL Check)")
 
-        has_nfc = bool(req.nfc_serial)
-        user_status = "active" if has_nfc else "pending_nfc"
-
-        new_user = models.User(
-            user_code=req.user_code,
-            full_name=req.full_name,
-            gender=req.gender,
-            birth_year=req.birth_year,
-            phone_number=req.phone_number,
-            address=req.address,
-            email=req.email,
-            nfc_tag_id=req.nfc_serial if has_nfc else None,
-            status=user_status
-        )
-        db.add(new_user)
+        # 2. Insert User
+        insert_sql = text("""
+            INSERT INTO users (user_code, full_name, gender, birth_year, phone_number, address, email, nfc_tag_id, status)
+            VALUES (:code, :name, :gender, :birth, :phone, :addr, :email, :nfc, :status)
+        """)
+        db.execute(insert_sql, {
+            "code": req.user_code,
+            "name": req.full_name,
+            "gender": req.gender,
+            "birth": req.birth_year,
+            "phone": req.phone_number,
+            "addr": req.address,
+            "email": req.email,
+            "nfc": req.nfc_serial if bool(req.nfc_serial) else None,
+            "status": "active" if bool(req.nfc_serial) else "pending_nfc"
+        })
+        
+        # 3. Update Request
+        update_sql = text("UPDATE registration_requests SET request_status = 'approved' WHERE request_id = :rid")
+        db.execute(update_sql, {"rid": request_id})
+        
         db.commit()
 
         if req.email:
