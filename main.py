@@ -488,23 +488,15 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
 
         if req.email:
             if has_nfc:
-                body = (f"Chào {req.full_name},
-
-"
-                        f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.
-"
-                        f"Thẻ vật lý của bạn đã được liên kết với hệ thống.
-"
+                body = (f"Chào {req.full_name},\n\n"
+                        f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.\n"
+                        f"Thẻ vật lý của bạn đã được liên kết với hệ thống.\n\n"
                         f"Trân trọng.")
                 send_email_notification(req.email, "Đăng ký thành công", body)
             else:
-                body = (f"Chào {req.full_name},
-
-"
-                        f"Đơn đăng ký thẻ SmartLib của bạn đã được duyệt!
-"
-                        f"Tuy nhiên, bạn chưa có thẻ NFC. Vui lòng đến thư viện trong thời gian sớm nhất để được cấp thẻ vật lý và liên kết tài khoản.
-"
+                body = (f"Chào {req.full_name},\n\n"
+                        f"Đơn đăng ký thẻ SmartLib của bạn đã được duyệt!\n"
+                        f"Tuy nhiên, bạn chưa có thẻ NFC. Vui lòng đến thư viện trong thời gian sớm nhất để được cấp thẻ vật lý và liên kết tài khoản.\n\n"
                         f"Trân trọng.")
                 send_email_notification(req.email, "Đăng ký thành công - Vui lòng nhận thẻ", body)
 
