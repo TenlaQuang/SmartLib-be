@@ -138,19 +138,6 @@ def _commit_or_rollback(db: Session):
 def read_root():
     return {"message": "SmartLib API v2.1.2 - Online", "status": "ok"}
 
-@app.post("/api/admin/wipe-all-data-secret-123456")
-def wipe_data(db: Session = Depends(get_db)):
-    """Xóa sạch dữ liệu từ phía server để đồng bộ database."""
-    try:
-        tables = ['registration_requests', 'users', 'nfc_inventory', 'nfc_orders']
-        for table in tables:
-            db.execute(text(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE"))
-        db.commit()
-        return {"message": "Đã xóa sạch dữ liệu trên SERVER thành công!"}
-    except Exception as e:
-        db.rollback()
-        return {"error": str(e)}
-
 
 @app.get("/api/test-db")
 def test_db(db: Session = Depends(get_db)):
