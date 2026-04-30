@@ -708,6 +708,44 @@ def get_user_activity(user_id: int, db: Session = Depends(get_db)):
         "history": completed
     }
 
+@app.get("/api/locations", response_model=List[schemas.LocationWithCount])
+def get_locations(db: Session = Depends(get_db)):
+    """Lấy danh sách các kệ sách (vị trí) và số lượng sách trên mỗi kệ."""
+    locations = db.query(models.Location).all()
+    result = []
+    for loc in locations:
+        count = db.query(models.Book).filter(models.Book.location_id == loc.location_id).count()
+        result.append({
+            "location_id": loc.location_id,
+            "zone_name": loc.zone_name,
+            "aisle_number": loc.aisle_number,
+            "shelf_id": loc.shelf_id,
+            "level_number": loc.level_number,
+            "book_count": count
+        })
+    return result
+
+@app.get("/api/shelves/{shelf_id}")
+def get_shelf_details(shelf_id: str, db: Session = Depends(get_db)):
+    """Lấy chi tiết phân tầng và sách trong một kệ cụ thể."""
+    locations = db.query(models.Location).filter(models.Location.shelf_id == shelf_id).order_by(models.Location.level_number).all()
+    
+    result = []
+    for loc in locations:
+        books = db.query(models.Book).filter(models.Book.location_id == loc.location_id).all()
+        result.append({
+            "level_number": loc.level_number,
+            "books": [
+                {
+                    "book_id": b.book_id,
+                    "title": b.title,
+                    "image_url": b.image_url,
+                    "isbn": b.isbn
+                } for b in books
+            ]
+        })
+    return result
+
 @app.post("/api/login-nfc")
 def login_nfc(payload: schemas.AssignNFC, db: Session = Depends(get_db)):
     """Đăng nhập bằng thẻ NFC."""

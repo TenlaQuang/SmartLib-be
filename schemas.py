@@ -10,6 +10,13 @@ class LocationBase(BaseModel):
     shelf_id: Optional[str] = None
     level_number: Optional[int] = None
 
+class LocationWithCount(LocationBase):
+    location_id: int
+    book_count: int
+    
+    class Config:
+        from_attributes = True
+
 class Location(LocationBase):
     location_id: int
     class Config:
