@@ -28,7 +28,9 @@ def send_html_email(to_email: str, subject: str, html_content: str, text_content
     msg.attach(part2)
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        # Sử dụng port 587 và STARTTLS (ổn định hơn trên Cloud/Render)
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls() # Bảo mật kết nối
             server.login(sender_email, sender_password)
             server.send_message(msg)
             print(f"Đã gửi mail tới: {to_email}")
