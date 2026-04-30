@@ -454,6 +454,30 @@ def get_users(db: Session = Depends(get_db)):
     """Lấy danh sách tất cả người dùng chính thức."""
     return db.query(models.User).all()
 
+@app.get("/api/users/check/{user_code}")
+def check_user_for_nfc(user_code: str, db: Session = Depends(get_db)):
+    """Kiểm tra mã sinh viên để đăng ký thẻ NFC."""
+    user = db.query(models.User).filter(models.User.user_code == user_code).first()
+    if not user:
+        return {
+            "status": "not_found", 
+            "message": "Mã sinh viên chưa đăng ký hoặc chưa được thư viện duyệt."
+        }
+    
+    if user.nfc_tag_id:
+        return {
+            "status": "active", 
+            "message": "Sinh viên này đã có thẻ NFC rồi.",
+            "full_name": user.full_name
+        }
+    
+    return {
+        "status": "pending_nfc", 
+        "message": "Thông tin hợp lệ. Vui lòng quẹt thẻ NFC để kích hoạt.",
+        "user_id": user.user_id,
+        "full_name": user.full_name
+    }
+
 @app.get("/api/registration-requests", response_model=List[schemas.RegistrationRequestResponse])
 def get_registration_requests(db: Session = Depends(get_db)):
     """Lấy danh sách đơn đăng ký chờ duyệt."""
