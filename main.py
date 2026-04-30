@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 import schemas
+import email_utils
 
 # ==============================================================================
 # Cấu hình dịch vụ bên ngoài
@@ -363,7 +364,10 @@ def register_user(req_in: schemas.RegistrationRequestCreate, db: Session = Depen
         new_req = models.RegistrationRequest(**req_in.model_dump())
         db.add(new_req)
         db.commit()
-        db.refresh(new_req)
+        # Gửi email thông báo đã nhận đơn
+        if new_req.email:
+            html = email_utils.get_new_request_template(new_req.full_name, new_req.user_code)
+            email_utils.send_html_email(new_req.email, "SmartLib - Đã nhận đơn đăng ký", html)
 
         # Trả về kết quả
         return new_req
@@ -492,19 +496,8 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         db.commit()
 
         if req.email:
-            # Gửi mail thông báo...
-            if has_nfc:
-                body = (f"Chào {req.full_name},\n\n"
-                        f"Tài khoản SmartLib của bạn đã được khởi tạo thành công.\n"
-                        f"Thẻ vật lý của bạn đã được liên kết với hệ thống.\n\n"
-                        f"Trân trọng.")
-                send_email_notification(req.email, "Đăng ký thành công", body)
-            else:
-                body = (f"Chào {req.full_name},\n\n"
-                        f"Đơn đăng ký thẻ SmartLib của bạn đã được duyệt!\n"
-                        f"Tuy nhiên, bạn chưa có thẻ NFC. Vui lòng đến thư viện trong thời gian sớm nhất để được cấp thẻ vật lý và liên kết tài khoản.\n\n"
-                        f"Trân trọng.")
-                send_email_notification(req.email, "Đăng ký thành công - Vui lòng nhận thẻ", body)
+            html = email_utils.get_approval_template(req.full_name, has_nfc)
+            email_utils.send_html_email(req.email, "SmartLib - Duyệt đơn đăng ký thành công", html)
 
         return {"message": "Đã duyệt thành công"}
     except Exception as e:
@@ -526,12 +519,8 @@ def reject_registration_request(request_id: int, payload: schemas.RegistrationRe
         db.commit()
         
         if req.email:
-            body = (f"Chào {req.full_name},\n\n"
-                    f"Đơn đăng ký của bạn TỪ CHỐI.\n"
-                    f"Lý do: {payload.reason}\n\n"
-                    f"Vui lòng liên hệ thủ thư.\n"
-                    f"Trân trọng,")
-            send_email_notification(req.email, "Thông Báo Từ Chối Thư Viện", body)
+            html = email_utils.get_rejection_template(req.full_name, payload.reason)
+            email_utils.send_html_email(req.email, "SmartLib - Thông báo kết quả đăng ký", html)
             
         return {"message": "Đã từ chối đơn thành công"}
     except Exception as e:
