@@ -314,6 +314,82 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload thất bại: {str(e)}")
 
+@app.get("/api/categories")
+def get_categories(db: Session = Depends(get_db)):
+    return db.query(models.Category).all()
+
+@app.post("/api/books/import-csv")
+async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Nhập sách hàng loạt từ file CSV/Excel của người dùng."""
+    try:
+        content = await file.read()
+        filename = file.filename.lower()
+        
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(content))
+        else:
+            df = pd.read_excel(io.BytesIO(content))
+
+        # Các cột bắt buộc
+        required = ["title", "author", "isbn"]
+        for col in required:
+            if col not in df.columns:
+                raise HTTPException(status_code=400, detail=f"File thiếu cột bắt buộc: {col}")
+
+        # Map Khu vực (K1 -> A, K2 -> B...)
+        zone_map = {"K1": "A", "K2": "B", "K3": "C", "K4": "D", "K5": "E"}
+
+        count = 0
+        for _, row in df.iterrows():
+            if pd.isna(row["title"]): continue
+            
+            # 1. Xử lý Thể loại (Genre)
+            cat_id = None
+            genre_name = str(row.get("genre", "Chưa phân loại")).strip()
+            category = db.query(models.Category).filter(models.Category.name == genre_name).first()
+            if not category:
+                category = models.Category(name=genre_name)
+                db.add(category)
+                db.flush()
+            cat_id = category.category_id
+
+            # 2. Xử lý Vị trí (location_code: K1-T1-H1-V1)
+            loc_id = None
+            loc_code = str(row.get("location_code", ""))
+            if loc_code and "-" in loc_code:
+                parts = loc_code.split("-")
+                # parts[0] = K1, parts[1] = T1, parts[2] = H1
+                z_code = zone_map.get(parts[0])
+                s_id = parts[1].replace("T", "Kệ ")
+                l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
+                
+                location = db.query(models.Location).filter(
+                    models.Location.zone_name == z_code,
+                    models.Location.shelf_id == s_id,
+                    models.Location.level_number == l_num
+                ).first()
+                if location:
+                    loc_id = location.location_id
+
+            # 3. Tạo sách
+            db.add(models.Book(
+                isbn=str(row["isbn"]),
+                title=str(row["title"]),
+                author=str(row["author"]),
+                image_url=str(row.get("image_url", "")),
+                category_id=cat_id,
+                location_id=loc_id,
+                market_price=50000, # Giá mặc định nếu ko có
+                status="available"
+            ))
+            count += 1
+            
+        db.commit()
+        return {"message": f"Đã nhập thành công {count} cuốn sách!", "count": count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi nhập file: {str(e)}")
+
 
 @app.post("/api/books/import-excel")
 async def import_books_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
