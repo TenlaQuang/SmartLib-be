@@ -1,41 +1,29 @@
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 
 def send_html_email(to_email: str, subject: str, html_content: str, text_content: str = ""):
-    """Gửi email định dạng HTML chuyên nghiệp."""
-    sender_email = os.getenv("SMTP_EMAIL")
-    sender_password = os.getenv("SMTP_PASSWORD")
+    """Gửi email định dạng HTML chuyên nghiệp qua Resend API (Khắc phục lỗi Render chặn SMTP)."""
+    api_key = os.getenv("RESEND_API_KEY")
     
-    if not sender_email or not sender_password:
-        print("Bỏ qua gửi mail: Chưa cấu hình SMTP_EMAIL/SMTP_PASSWORD")
+    if not api_key:
+        print("Bỏ qua gửi mail: Chưa cấu hình RESEND_API_KEY trong Environment")
         return
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"SmartLib System <{sender_email}>"
-    msg["To"] = to_email
-
-    # Phần text (cho các mail client cũ)
-    if not text_content:
-        text_content = "Vui lòng xem email này bằng trình duyệt hỗ trợ HTML."
-    
-    part1 = MIMEText(text_content, "plain")
-    part2 = MIMEText(html_content, "html")
-
-    msg.attach(part1)
-    msg.attach(part2)
+    resend.api_key = api_key
 
     try:
-        # Sử dụng port 587 và STARTTLS (ổn định hơn trên Cloud/Render)
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls() # Bảo mật kết nối
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-            print(f"Đã gửi mail tới: {to_email}")
+        # Nếu dùng bản miễn phí Resend, email gửi đi phải là onboarding@resend.dev
+        params = {
+            "from": "SmartLib System <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+
+        r = resend.Emails.send(params)
+        print(f"Đã gửi mail thành công qua Resend tới: {to_email} (ID: {r.id})")
     except Exception as e:
-        print(f"Lỗi SMTP: {e}")
+        print(f"Lỗi Resend API: {e}")
 
 def get_approval_template(full_name: str, has_nfc: bool):
     """Template HTML cho việc duyệt đơn."""
