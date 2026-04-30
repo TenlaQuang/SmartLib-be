@@ -471,6 +471,13 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
     try:
         req.request_status = "approved"
         
+        # Kiểm tra xem User đã tồn tại chưa để tránh lỗi UniqueViolation
+        existing_user = db.query(models.User).filter(models.User.user_code == req.user_code).first()
+        if existing_user:
+             # Nếu user đã tồn tại, có thể cập nhật thông tin hoặc báo lỗi
+             # Ở đây ta báo lỗi cụ thể để thủ thư biết
+             raise Exception(f"Mã sinh viên {req.user_code} đã tồn tại trong hệ thống người dùng chính thức.")
+
         has_nfc = bool(req.nfc_serial)
         user_status = "active" if has_nfc else "pending_nfc"
 
