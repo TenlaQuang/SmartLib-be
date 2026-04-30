@@ -159,25 +159,52 @@ def get_books(db: Session = Depends(get_db), limit: int = 100):
 
 @app.get("/api/books/title-groups")
 def get_book_title_groups(db: Session = Depends(get_db)):
-    """Trả về danh sách NHÓM ĐẦU SÁCH (gom theo title)."""
+    """Trả về danh sách NHÓM ĐẦU SÁCH kèm thống kê Mượn/Trả."""
     books = db.query(models.Book).all()
     groups = {}
     for book in books:
-        key = book.title
+        key = book.isbn # Gom nhóm theo ISBN là chuẩn nhất
         if key not in groups:
-            groups[key] = {"title": book.title, "image_url": book.image_url, "total_copies": 0, "copies_waiting": 0, "copies_on_shelf": 0, "locations": {}}
+            groups[key] = {
+                "isbn": book.isbn,
+                "title": book.title, 
+                "image_url": book.image_url, 
+                "total_copies": 0, 
+                "available_count": 0,
+                "borrowed_count": 0,
+                "copies_waiting": 0, 
+                "locations": {}
+            }
+        
         groups[key]["total_copies"] += 1
+        
+        # Thống kê trạng thái mượn trả
+        if book.status == "borrowed":
+            groups[key]["borrowed_count"] += 1
+        else:
+            groups[key]["available_count"] += 1
+
+        # Thống kê vị trí xếp kệ
         if book.location_id is None:
             groups[key]["copies_waiting"] += 1
         else:
-            groups[key]["copies_on_shelf"] += 1
             loc = book.location
             if loc:
-                loc_label = f"Khu {loc.zone_name} - {loc.shelf_id}" + (f" (Tầng {loc.level_number})" if loc.level_number else "")
+                loc_label = f"Khu {loc.zone_name} - {loc.shelf_id} - Tầng {loc.level_number}"
                 groups[key]["locations"][loc_label] = groups[key]["locations"].get(loc_label, 0) + 1
+                
     result = []
-    for title, g in groups.items():
-        result.append({"title": g["title"], "image_url": g["image_url"], "total_copies": g["total_copies"], "copies_waiting": g["copies_waiting"], "copies_on_shelf": g["copies_on_shelf"], "location_summary": [{"location": k, "count": v} for k, v in g["locations"].items()]})
+    for isbn, g in groups.items():
+        result.append({
+            "isbn": g["isbn"],
+            "title": g["title"], 
+            "image_url": g["image_url"], 
+            "total_copies": g["total_copies"],
+            "available_count": g["available_count"],
+            "borrowed_count": g["borrowed_count"],
+            "copies_waiting": g["copies_waiting"], 
+            "location_summary": [{"location": k, "count": v} for k, v in g["locations"].items()]
+        })
     return result
 
 
