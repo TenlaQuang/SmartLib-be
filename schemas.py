@@ -9,6 +9,7 @@ class LocationBase(BaseModel):
     aisle_number: Optional[int] = None
     shelf_id: Optional[str] = None
     level_number: Optional[int] = None
+    max_capacity: Optional[int] = 50
 
 class LocationWithCount(LocationBase):
     location_id: int

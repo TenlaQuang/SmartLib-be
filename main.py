@@ -188,6 +188,14 @@ def get_book(book_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/books", response_model=schemas.BookResponse)
 def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
+    # Kiểm tra sức chứa của vị trí
+    if book_in.location_id:
+        loc = db.query(models.Location).filter(models.Location.location_id == book_in.location_id).first()
+        if loc:
+            current_count = db.query(models.Book).filter(models.Book.location_id == book_in.location_id).count()
+            if current_count >= loc.max_capacity:
+                raise HTTPException(status_code=400, detail=f"Vị trí {loc.zone_name} - {loc.shelf_id} - Hàng {loc.level_number} đã đầy ({loc.max_capacity} cuốn).")
+
     new_book = models.Book(**book_in.model_dump())
     db.add(new_book)
     _commit_or_rollback(db)
@@ -198,6 +206,15 @@ def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
 @app.put("/api/books/{book_id}", response_model=schemas.BookResponse)
 def update_book(book_id: int, book_in: schemas.BookUpdate, db: Session = Depends(get_db)):
     book = _get_or_404(db, models.Book, models.Book.book_id, book_id, "sách")
+    
+    # Nếu cập nhật vị trí mới, kiểm tra sức chứa
+    if book_in.location_id and book_in.location_id != book.location_id:
+        loc = db.query(models.Location).filter(models.Location.location_id == book_in.location_id).first()
+        if loc:
+            current_count = db.query(models.Book).filter(models.Book.location_id == book_in.location_id).count()
+            if current_count >= loc.max_capacity:
+                raise HTTPException(status_code=400, detail=f"Vị trí mới đã đầy ({loc.max_capacity} cuốn).")
+
     for key, value in book_in.model_dump(exclude_unset=True).items():
         setattr(book, key, value)
     _commit_or_rollback(db)

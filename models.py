@@ -21,6 +21,7 @@ class Location(Base):
     aisle_number = Column(Integer, nullable=True)
     shelf_id = Column(String(20), nullable=True)
     level_number = Column(Integer, nullable=True)
+    max_capacity = Column(Integer, default=50) # Giới hạn 50 cuốn mỗi hàng
     description = Column(Text, nullable=True)
 
     books = relationship("Book", back_populates="location")
