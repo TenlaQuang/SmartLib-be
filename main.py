@@ -679,6 +679,23 @@ def remind_nfc_pickup(user_id: int, background_tasks: BackgroundTasks, db: Sessi
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/login-nfc")
+def login_nfc(payload: schemas.AssignNFC, db: Session = Depends(get_db)):
+    """Đăng nhập bằng thẻ NFC."""
+    user = db.query(models.User).filter(models.User.nfc_tag_id == payload.nfc_serial).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Thẻ NFC này chưa được đăng ký trong hệ thống.")
+    
+    return {
+        "status": "success",
+        "message": f"Xin chào, {user.full_name}!",
+        "user": {
+            "user_id": user.user_id,
+            "full_name": user.full_name,
+            "user_code": user.user_code
+        }
+    }
+
 @app.post("/api/users/{user_id}/lock-nfc")
 def lock_user_nfc(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Khóa thẻ NFC từ xa (Dùng khi mất thẻ)."""
