@@ -143,7 +143,13 @@ def read_root():
 def test_db(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
-        return {"status": "ok", "message": "Kết nối Database thành công!"}
+        db_url = os.getenv("DATABASE_URL", "NOT_FOUND")
+        masked_url = db_url[:20] + "..." + db_url[-20:] if len(db_url) > 40 else "URL_TOO_SHORT"
+        return {
+            "status": "ok", 
+            "message": "Kết nối Database thành công!",
+            "db_info": masked_url
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
