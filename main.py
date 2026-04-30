@@ -176,6 +176,13 @@ def test_db(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/debug/users")
+def debug_users(db: Session = Depends(get_db)):
+    """Debug: lấy raw users từ DB."""
+    result = db.execute(text("SELECT user_id, user_code, full_name, status FROM users")).fetchall()
+    return [{"user_id": r[0], "user_code": r[1], "full_name": r[2], "status": r[3]} for r in result]
+
+
 # ==============================================================================
 # Books
 # ==============================================================================
@@ -499,6 +506,13 @@ def approve_registration_request(request_id: int, db: Session = Depends(get_db))
         
         has_nfc = bool(req.nfc_serial)
         user_status = "active" if has_nfc else "pending_nfc"
+
+        # Kiểm tra user_code đã tồn tại chưa (tránh duplicate key)
+        existing_user = db.query(models.User).filter(models.User.user_code == req.user_code).first()
+        if existing_user:
+            # User đã tồn tại, chỉ cập nhật trạng thái đơn
+            db.commit()
+            return {"message": "Tài khoản đã tồn tại, đã cập nhật trạng thái đơn"}
 
         new_user = models.User(
             user_code=req.user_code,
