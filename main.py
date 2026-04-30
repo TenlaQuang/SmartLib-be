@@ -53,6 +53,34 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+from database import engine
+
+@app.on_event("startup")
+def auto_migrate():
+    """Tự động thêm các cột mới vào DB nếu chưa tồn tại."""
+    migrations = [
+        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS nfc_serial VARCHAR(100)",
+        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS invoice_image_url VARCHAR(500)",
+        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'pending'",
+        "ALTER TABLE registration_requests ADD COLUMN IF NOT EXISTS payos_order_code BIGINT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending_nfc'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(15)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100)",
+        "CREATE TABLE IF NOT EXISTS nfc_inventory (tag_id SERIAL PRIMARY KEY, nfc_serial VARCHAR(100) UNIQUE NOT NULL, label VARCHAR(100) NOT NULL, status VARCHAR(20) DEFAULT 'available', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+            except Exception as e:
+                print(f"[Migration skip] {e}")
+        conn.commit()
+    print("[Startup] DB migration done.")
+
+
 @app.middleware("http")
 async def add_cors_header(request, call_next):
     # Xử lý các request OPTIONS (Preflight)
