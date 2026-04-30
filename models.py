@@ -45,6 +45,7 @@ class Book(Base):
     book_id = Column(Integer, primary_key=True, index=True)
     isbn = Column(String(20), nullable=False, index=True)
     title = Column(String(255), nullable=False)
+    author = Column(String(255), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.category_id"), nullable=True)
     location_id = Column(Integer, ForeignKey("locations.location_id"), nullable=True)
     import_id = Column(Integer, ForeignKey("import_logs.import_id"), nullable=True)

@@ -40,6 +40,7 @@ class Category(CategoryBase):
 class BookBase(BaseModel):
     isbn: str
     title: str
+    author: Optional[str] = None
     status: Optional[str] = "available"
     market_price: Decimal
     rental_rate_percent: Optional[Decimal] = Decimal("1.0")
@@ -55,6 +56,7 @@ class BookCreate(BookBase):
 class BookUpdate(BaseModel):
     isbn: Optional[str] = None
     title: Optional[str] = None
+    author: Optional[str] = None
     status: Optional[str] = None
     market_price: Optional[Decimal] = None
     rental_rate_percent: Optional[Decimal] = None

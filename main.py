@@ -158,16 +158,30 @@ def get_books(db: Session = Depends(get_db), limit: int = 100):
 
 
 @app.get("/api/books/title-groups")
-def get_book_title_groups(db: Session = Depends(get_db)):
-    """Trả về danh sách NHÓM ĐẦU SÁCH kèm thống kê Mượn/Trả."""
-    books = db.query(models.Book).all()
+def get_book_title_groups(q: Optional[str] = None, category_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """Trả về danh sách NHÓM ĐẦU SÁCH kèm thống kê Mượn/Trả và tìm kiếm."""
+    query = db.query(models.Book)
+    
+    if q:
+        search_filter = f"%{q}%"
+        query = query.filter(
+            (models.Book.title.ilike(search_filter)) | 
+            (models.Book.author.ilike(search_filter)) |
+            (models.Book.isbn.ilike(search_filter))
+        )
+    
+    if category_id:
+        query = query.filter(models.Book.category_id == category_id)
+
+    books = query.all()
     groups = {}
     for book in books:
-        key = book.isbn # Gom nhóm theo ISBN là chuẩn nhất
+        key = book.isbn # Gom nhóm theo ISBN
         if key not in groups:
             groups[key] = {
                 "isbn": book.isbn,
                 "title": book.title, 
+                "author": book.author,
                 "image_url": book.image_url, 
                 "total_copies": 0, 
                 "available_count": 0,
@@ -198,6 +212,7 @@ def get_book_title_groups(db: Session = Depends(get_db)):
         result.append({
             "isbn": g["isbn"],
             "title": g["title"], 
+            "author": g["author"],
             "image_url": g["image_url"], 
             "total_copies": g["total_copies"],
             "available_count": g["available_count"],
