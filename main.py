@@ -360,6 +360,7 @@ async def register_user(
     phone_number: str = Form(...),
     address: str = Form(...),
     email: str = Form(...),
+    payos_order_code: int = Form(0),
     nfc_serial: str = Form(None),
     invoice_image: UploadFile = File(None),
     db: Session = Depends(get_db)
@@ -382,7 +383,8 @@ async def register_user(
         new_req = models.RegistrationRequest(
             user_code=user_code, full_name=full_name, gender=gender,
             birth_year=birth_year, phone_number=phone_number, address=address,
-            email=email, nfc_serial=nfc_serial, invoice_image=image_url
+            email=email, nfc_serial=nfc_serial, invoice_image_url=image_url,
+            payos_order_code=payos_order_code
         )
         db.add(new_req)
         db.commit()
