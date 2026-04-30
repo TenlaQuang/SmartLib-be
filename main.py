@@ -570,11 +570,8 @@ def reissue_nfc_card(user_id: int, payload: schemas.RegistrationApproveWithTag, 
         db.commit()
         
         if user.email:
-            body = (f"Chào {user.full_name},\n\n"
-                    f"Thẻ của bạn đã được thay mới vì mất cấp lại.\n"
-                    f"Mã đánh dấu thẻ vật lý của bạn là: {tag.label}.\n\n"
-                    f"Trân trọng.")
-            send_email_notification(user.email, "Gán NFC Thẻ Mới Thành Công", body)
+            html = email_utils.get_reissue_nfc_template(user.full_name, tag.nfc_serial)
+            email_utils.send_html_email(user.email, "SmartLib - Thông báo cấp lại thẻ NFC thành công", html)
             
         return {"message": "Đã cấp lại thành công thẻ từ kho"}
     except Exception as e:
@@ -598,16 +595,14 @@ def assign_nfc_to_user(user_id: int, payload: schemas.AssignNFC, db: Session = D
         db.commit()
         
         if user.email:
-            body = (f"Chào {user.full_name},\n\n"
-                    f"Tài khoản SmartLib của bạn đã được liên kết thành công với thẻ vật lý NFC.\n"
-                    f"Bạn đã có thể sử dụng đầy đủ các dịch vụ mượn sách.\n"
-                    f"Trân trọng.")
-            send_email_notification(user.email, "Kích hoạt Thẻ NFC Thành Công", body)
+            html = email_utils.get_reissue_nfc_template(user.full_name, payload.nfc_serial) # Dùng chung template reissue vì nội dung tương đương
+            email_utils.send_html_email(user.email, "SmartLib - Thẻ của bạn đã được kích hoạt", html)
             
         return {"message": "Đã gán thẻ thành công"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/users/{user_id}/remind-nfc")
 def remind_nfc_pickup(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
@@ -615,16 +610,12 @@ def remind_nfc_pickup(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Không tìm thấy user")
         
     if user.status != "pending_nfc":
-        raise HTTPException(status_code=400, detail="User này đã có thẻ.")
+        raise HTTPException(status_code=400, detail="User này đã có thẻ hoặc không ở trạng thái chờ nhận thẻ.")
         
     try:
         if user.email:
-            body = (f"Chào {user.full_name},\n\n"
-                    f"Đây là lời nhắc nhở từ thư viện.\n"
-                    f"Tài khoản SmartLib của bạn đã được duyệt nhưng bạn vẫn CHƯA đến nhận thẻ vật lý.\n"
-                    f"Vui lòng đến quầy thủ thư để nhận thẻ và kích hoạt dịch vụ.\n\n"
-                    f"Trân trọng.")
-            send_email_notification(user.email, "Nhắc nhở: Lên nhận thẻ thư viện", body)
+            html = email_utils.get_remind_nfc_template(user.full_name)
+            email_utils.send_html_email(user.email, "Nhắc nhở: Lên nhận thẻ thư viện SmartLib", html)
             
         return {"message": "Đã gửi email nhắc nhở"}
     except Exception as e:

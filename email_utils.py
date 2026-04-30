@@ -105,3 +105,44 @@ def get_new_request_template(full_name: str, user_code: str):
     </body>
     </html>
     """
+def get_remind_nfc_template(full_name: str):
+    """Template HTML cho việc nhắc nhở sinh viên đến nhận thẻ NFC."""
+    return f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #ff9800; text-align: center;">Nhắc nhở: Lên nhận thẻ SmartLib</h2>
+            <p>Chào <strong>{full_name}</strong>,</p>
+            <p>Tài khoản thư viện SmartLib của bạn đã được duyệt và sẵn sàng sử dụng.</p>
+            <p>Tuy nhiên, hệ thống ghi nhận bạn <strong>chưa đến nhận thẻ NFC vật lý</strong> tại quầy thủ thư.</p>
+            <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; color: #e65100; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>Hành động:</strong> Vui lòng mang theo thẻ sinh viên đến quầy thủ thư trong giờ hành chính để được cấp thẻ và hướng dẫn sử dụng.
+            </div>
+            <p>Cảm ơn bạn đã hợp tác!</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="font-size: 12px; color: #888; text-align: center;">SmartLib System</p>
+        </div>
+    </body>
+    </html>
+    """
+
+def get_reissue_nfc_template(full_name: str, nfc_tag_id: str):
+    """Template HTML cho việc cấp lại thẻ NFC mới."""
+    return f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #2196f3; text-align: center;">Thông báo: Cấp lại thẻ SmartLib</h2>
+            <p>Chào <strong>{full_name}</strong>,</p>
+            <p>Yêu cầu cấp lại thẻ của bạn đã được thực hiện thành công.</p>
+            <div style="background-color: #e3f2fd; border: 1px solid #bbdefb; color: #0d47a1; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>Thông tin thẻ mới:</strong><br>
+                Mã số thẻ: <span style="font-family: monospace; font-weight: bold;">{nfc_tag_id}</span>
+            </div>
+            <p>Thẻ cũ của bạn đã được vô hiệu hóa để đảm bảo an toàn. Bạn có thể sử dụng thẻ mới này để mượn/trả sách ngay lập tức.</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="font-size: 12px; color: #888; text-align: center;">SmartLib System</p>
+        </div>
+    </body>
+    </html>
+    """

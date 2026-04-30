@@ -17,6 +17,7 @@ __pycache__/
 sqla
 smartLib-v2
 sql-smartlib.txt
+sql-v3
 *.sqlite3
 
 # OS generated files
