@@ -103,3 +103,16 @@ class NfcTag(Base):
     label = Column(String(100), nullable=False)
     status = Column(String(20), default="available") # available | assigned
     created_at = Column(DateTime, default=datetime.utcnow)
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    transaction_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    book_id = Column(Integer, ForeignKey("books.book_id"), nullable=False)
+    borrow_date = Column(DateTime, default=datetime.utcnow)
+    due_date = Column(DateTime, nullable=False)
+    return_date = Column(DateTime, nullable=True)
+    deposit_amount = Column(Numeric(12, 2), nullable=True)
+    total_fee = Column(Numeric(12, 2), default=0)
+    refund_amount = Column(Numeric(12, 2), default=0)
+    status = Column(String(20), default="ongoing")

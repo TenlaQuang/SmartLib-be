@@ -679,6 +679,35 @@ def remind_nfc_pickup(user_id: int, background_tasks: BackgroundTasks, db: Sessi
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/users/{user_id}/activity", response_model=schemas.UserActivityResponse)
+def get_user_activity(user_id: int, db: Session = Depends(get_db)):
+    """Lấy thông tin mượn trả của sinh viên."""
+    all_trans = db.query(models.Transaction).filter(models.Transaction.user_id == user_id).all()
+    
+    ongoing = []
+    completed = []
+    
+    for t in all_trans:
+        book = db.query(models.Book).filter(models.Book.book_id == t.book_id).first()
+        res = schemas.TransactionResponse(
+            transaction_id=t.transaction_id,
+            book_title=book.title if book else "Không rõ",
+            borrow_date=t.borrow_date,
+            due_date=t.due_date,
+            status=t.status
+        )
+        if t.status == "ongoing":
+            ongoing.append(res)
+        else:
+            completed.append(res)
+            
+    return {
+        "ongoing_count": len(ongoing),
+        "ongoing_books": ongoing,
+        "completed_count": len(completed),
+        "history": completed
+    }
+
 @app.post("/api/login-nfc")
 def login_nfc(payload: schemas.AssignNFC, db: Session = Depends(get_db)):
     """Đăng nhập bằng thẻ NFC."""

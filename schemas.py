@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from decimal import Decimal
+from datetime import datetime
 
 # --- Location Schemas ---
 class LocationBase(BaseModel):
@@ -157,3 +158,19 @@ class RegistrationApproveWithTag(BaseModel):
 
 class AssignNFC(BaseModel):
     nfc_serial: str
+
+class TransactionResponse(BaseModel):
+    transaction_id: int
+    book_title: str
+    borrow_date: datetime
+    due_date: datetime
+    status: str
+    
+    class Config:
+        from_attributes = True
+
+class UserActivityResponse(BaseModel):
+    ongoing_count: int
+    ongoing_books: List[TransactionResponse]
+    completed_count: int
+    history: List[TransactionResponse]
