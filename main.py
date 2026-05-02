@@ -336,8 +336,8 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             if col not in df.columns:
                 raise HTTPException(status_code=400, detail=f"File thiếu cột bắt buộc: {col}")
 
-        # Map Khu vực (K1 -> A, K2 -> B...)
-        zone_map = {"K1": "A", "K2": "B", "K3": "C", "K4": "D", "K5": "E"}
+        # Map Khu vực (Khớp với dữ liệu thực tế trong DB của bạn)
+        zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
 
         count = 0
         for _, row in df.iterrows():
@@ -360,8 +360,8 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             if loc_code and "-" in loc_code:
                 parts = loc_code.split("-")
                 # parts[0]=K1, parts[1]=T1, parts[2]=H1, parts[3]=V1
-                z_code = zone_map.get(parts[0])
-                s_id = parts[1].replace("T", "Kệ ")
+                z_code = zone_map.get(parts[0], parts[0]) 
+                s_id = parts[1].replace("T", "Ke ") # Khớp với "Ke 1" trong DB
                 l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
                 if len(parts) > 3:
                     pos_in_row = int(parts[3].replace("V", ""))
