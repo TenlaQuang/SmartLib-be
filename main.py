@@ -320,26 +320,30 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/books/import-csv")
 async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Nhập sách hàng loạt từ file CSV/Excel với tốc độ cao (Optimized)."""
+    """Nhập sách hàng loạt từ file CSV/Excel với khả năng tự thích nghi cao."""
     try:
         content = await file.read()
         filename = file.filename.lower()
-        print(f"--- Bắt đầu nhập file: {filename} ---")
+        print(f"--- Nhận yêu cầu import: {filename} ---")
+        print(f"Dữ liệu nhận được (100 byte đầu): {content[:100]}")
         
-        # Đọc dữ liệu với xử lý BOM (utf-8-sig)
+        # Đọc dữ liệu
         if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(content), encoding='utf-8-sig')
+            # sep=None giúp pandas tự nhận diện dấu phẩy, chấm phẩy hoặc tab
+            df = pd.read_csv(io.BytesIO(content), encoding='utf-8-sig', sep=None, engine='python')
         else:
             df = pd.read_excel(io.BytesIO(content))
 
-        print(f"Các cột nhận được: {df.columns.tolist()}")
+        # Chuẩn hóa tên cột: Xóa dấu cách thừa và chuyển về chữ thường để so khớp
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        print(f"Danh sách cột sau khi chuẩn hóa: {df.columns.tolist()}")
 
-        # Các cột bắt buộc
+        # Các cột bắt buộc (dùng chữ thường)
         required = ["title", "author", "isbn"]
         for col in required:
             if col not in df.columns:
-                print(f"LỖI: Thiếu cột {col}")
-                raise HTTPException(status_code=400, detail=f"File thiếu cột bắt buộc: {col}. Các cột hiện có: {df.columns.tolist()}")
+                print(f"LỖI: Không tìm thấy cột '{col}'")
+                raise HTTPException(status_code=400, detail=f"File thiếu cột '{col}'. Các cột hiện có: {df.columns.tolist()}")
 
         # 1. CACHE: Tải toàn bộ Category và Location vào bộ nhớ để tránh query liên tục
         categories_cache = {c.name.strip(): c.id for c in db.execute(text("SELECT name, category_id as id FROM categories")).fetchall()}
