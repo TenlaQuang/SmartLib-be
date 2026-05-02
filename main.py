@@ -353,12 +353,22 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
         locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
         locations_cache = {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
 
+        # Tải toàn bộ ISBN hiện có để tránh trùng lặp
+        existing_isbns = {row[0] for row in db.execute(text("SELECT isbn FROM books")).fetchall()}
+
         zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
         books_to_add = []
         count = 0
+        skipped = 0
 
         for _, row in df.iterrows():
             if pd.isna(row["title"]): continue
+            
+            isbn = str(row.get("isbn", _generate_isbn(db))).strip()
+            # Bỏ qua nếu ISBN đã tồn tại
+            if isbn in existing_isbns:
+                skipped += 1
+                continue
             
             # Category
             genre_name = str(row.get("genre", "Chưa phân loại")).strip()
@@ -386,7 +396,7 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
 
             # Thêm sách vào hàng đợi
             books_to_add.append(models.Book(
-                isbn=str(row.get("isbn", _generate_isbn(db))),
+                isbn=isbn,
                 title=str(row["title"]),
                 author=str(row.get("author", "Chưa rõ")),
                 description=str(row.get("description", "")),
@@ -399,6 +409,7 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                 status="available"
             ))
             count += 1
+            existing_isbns.add(isbn) # Đánh dấu đã thêm để không trùng trong chính file đó
             
             if len(books_to_add) >= 500:
                 db.bulk_save_objects(books_to_add)
@@ -408,8 +419,8 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             db.bulk_save_objects(books_to_add)
             
         db.commit()
-        print(f"--- Đã nhập xong {count} cuốn sách ---")
-        return {"message": f"Thành công! Đã nhập {count} cuốn sách.", "count": count}
+        print(f"--- Đã nhập xong {count} cuốn (Bỏ qua {skipped} cuốn trùng) ---")
+        return {"message": f"Thành công! Đã nhập {count} cuốn sách. (Bỏ qua {skipped} cuốn đã có)", "count": count}
 
     except HTTPException: raise
     except Exception as e:
