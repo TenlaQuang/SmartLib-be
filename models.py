@@ -43,20 +43,20 @@ class Book(Base):
     __tablename__ = "books"
 
     book_id = Column(Integer, primary_key=True, index=True)
-    isbn = Column(String(20), nullable=False, index=True)
-    title = Column(String(255), nullable=False)
-    author = Column(String(255), nullable=True)
-    category_id = Column(Integer, ForeignKey("categories.category_id"), nullable=True)
-    location_id = Column(Integer, ForeignKey("locations.location_id"), nullable=True)
+    isbn = Column(String(50), unique=True, index=True)
+    title = Column(String(1000), index=True)
+    author = Column(String(1000), index=True)
+    category_id = Column(Integer, ForeignKey("categories.category_id"))
+    location_id = Column(Integer, ForeignKey("locations.location_id"))
     import_id = Column(Integer, ForeignKey("import_logs.import_id"), nullable=True)
     
-    market_price = Column(Numeric(12, 2), nullable=False)
-    rental_rate_percent = Column(Numeric(5, 2), default=1.0)
-    fine_rate_percent = Column(Numeric(5, 2), default=2.0)
-    deposit_required = Column(Numeric(12, 2), nullable=True)
+    market_price = Column(Float, default=0.0)
+    rental_rate_percent = Column(Float, default=1.0)
+    fine_rate_percent = Column(Float, default=2.0)
+    deposit_required = Column(Boolean, default=True)
     
-    status = Column(String(20), default="available")
-    image_url = Column(String(500), nullable=True)
+    status = Column(String(20), default="available") # available, borrowed, reserved, maintenance
+    image_url = Column(String(2000), nullable=True)
     description = Column(Text, nullable=True)
     pages = Column(Integer, nullable=True)
     position_in_row = Column(Integer, nullable=True) # Vị trí 1-50 trên hàng
