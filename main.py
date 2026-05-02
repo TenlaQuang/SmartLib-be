@@ -320,60 +320,57 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/books/import-csv")
 async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Nhập sách hàng loạt từ file CSV/Excel với khả năng tự thích nghi cao."""
+    """Nhập sách hàng loạt với cơ chế tự động sửa lỗi định dạng (Ultra Resilient)."""
     try:
         content = await file.read()
         filename = file.filename.lower()
-        print(f"--- Nhận yêu cầu import: {filename} ---")
-        print(f"Dữ liệu nhận được (100 byte đầu): {content[:100]}")
+        print(f"--- Nhận file: {filename} ({len(content)} bytes) ---")
         
-        # Đọc dữ liệu
-        if filename.endswith('.csv'):
-            # sep=None giúp pandas tự nhận diện dấu phẩy, chấm phẩy hoặc tab
-            df = pd.read_csv(io.BytesIO(content), encoding='utf-8-sig', sep=None, engine='python')
-        else:
-            df = pd.read_excel(io.BytesIO(content))
+        df = None
+        # Thử đọc với nhiều loại mã hóa khác nhau
+        for encoding in ['utf-8-sig', 'cp1252', 'latin1', 'utf-8']:
+            try:
+                if filename.endswith('.csv'):
+                    df = pd.read_csv(io.BytesIO(content), encoding=encoding, sep=None, engine='python')
+                else:
+                    df = pd.read_excel(io.BytesIO(content))
+                
+                # Thử chuẩn hóa cột để kiểm tra xem đã đọc đúng chưa
+                test_cols = [str(c).strip().lower() for c in df.columns]
+                if "title" in test_cols:
+                    print(f"✅ Đọc thành công với encoding: {encoding}")
+                    df.columns = test_cols
+                    break
+            except:
+                continue
+        
+        if df is None or "title" not in df.columns:
+            print(f"❌ KHÔNG THỂ ĐỌC FILE. Cột hiện có: {df.columns.tolist() if df is not None else 'None'}")
+            raise HTTPException(status_code=400, detail="Không thể nhận diện tiêu đề cột. Vui lòng kiểm tra lại file CSV.")
 
-        # Chuẩn hóa tên cột: Xóa dấu cách thừa và chuyển về chữ thường để so khớp
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        print(f"Danh sách cột sau khi chuẩn hóa: {df.columns.tolist()}")
-
-        # Các cột bắt buộc (dùng chữ thường)
-        required = ["title", "author", "isbn"]
-        for col in required:
-            if col not in df.columns:
-                print(f"LỖI: Không tìm thấy cột '{col}'")
-                raise HTTPException(status_code=400, detail=f"File thiếu cột '{col}'. Các cột hiện có: {df.columns.tolist()}")
-
-        # 1. CACHE: Tải toàn bộ Category và Location vào bộ nhớ để tránh query liên tục
+        # 1. CACHE DATA
         categories_cache = {c.name.strip(): c.id for c in db.execute(text("SELECT name, category_id as id FROM categories")).fetchall()}
-        
-        # Cache location theo key "zone|shelf|level"
         locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
         locations_cache = {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
 
         zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
-        
         books_to_add = []
         count = 0
-        
-        print(f"Đang xử lý {len(df)} dòng dữ liệu...")
 
         for _, row in df.iterrows():
             if pd.isna(row["title"]): continue
             
-            # Xử lý Thể loại (Gộp và tạo mới nếu cần)
+            # Category
             genre_name = str(row.get("genre", "Chưa phân loại")).strip()
             cat_id = categories_cache.get(genre_name)
             if not cat_id:
-                # Nếu chưa có trong cache, tạo mới trong DB
                 new_cat = models.Category(name=genre_name)
                 db.add(new_cat)
                 db.flush()
                 cat_id = new_cat.category_id
                 categories_cache[genre_name] = cat_id
 
-            # Xử lý Vị trí
+            # Location
             loc_id = None
             pos_in_row = None
             loc_code = str(row.get("location_code", ""))
@@ -385,17 +382,16 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                 if len(parts) > 3:
                     pos_in_row = int(parts[3].replace("V", ""))
                 
-                loc_key = f"{z_name}|{s_id}|{l_num}"
-                loc_id = locations_cache.get(loc_key)
+                loc_id = locations_cache.get(f"{z_name}|{s_id}|{l_num}")
 
-            # Tạo đối tượng sách (chưa lưu vào DB vội)
+            # Thêm sách vào hàng đợi
             books_to_add.append(models.Book(
-                isbn=str(row["isbn"]),
+                isbn=str(row.get("isbn", _generate_isbn(db))),
                 title=str(row["title"]),
-                author=str(row["author"]),
+                author=str(row.get("author", "Chưa rõ")),
                 description=str(row.get("description", "")),
-                pages=int(row.get("pages", 0)) if not pd.isna(row.get("pages")) else None,
-                market_price=float(row.get("price", 50000)) if not pd.isna(row.get("price")) else 50000,
+                pages=int(row.get("pages")) if not pd.isna(row.get("pages")) else None,
+                market_price=float(row.get("price", 0)) if not pd.isna(row.get("price")) else 0,
                 image_url=str(row.get("image_url", "")),
                 category_id=cat_id,
                 location_id=loc_id,
@@ -404,25 +400,22 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             ))
             count += 1
             
-            # Lưu theo đợt (batch 500 cuốn) để tránh quá tải
             if len(books_to_add) >= 500:
                 db.bulk_save_objects(books_to_add)
                 books_to_add = []
 
-        # Lưu nốt số còn lại
         if books_to_add:
             db.bulk_save_objects(books_to_add)
             
         db.commit()
-        print(f"✅ Đã nhập thành công {count} cuốn sách!")
-        return {"message": f"Đã nhập thành công {count} cuốn sách!", "count": count}
-        
-    except HTTPException:
-        raise
+        print(f"--- Đã nhập xong {count} cuốn sách ---")
+        return {"message": f"Thành công! Đã nhập {count} cuốn sách.", "count": count}
+
+    except HTTPException: raise
     except Exception as e:
         db.rollback()
-        print(f"❌ LỖI NGHIÊM TRỌNG: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi nhập file: {str(e)}")
+        print(f"Lỗi hệ thống: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/books/import-excel")
