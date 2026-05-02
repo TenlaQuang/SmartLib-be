@@ -320,62 +320,72 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/books/import-csv")
 async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Nhập sách hàng loạt từ file CSV/Excel của người dùng."""
+    """Nhập sách hàng loạt từ file CSV/Excel với tốc độ cao (Optimized)."""
     try:
         content = await file.read()
         filename = file.filename.lower()
+        print(f"--- Bắt đầu nhập file: {filename} ---")
         
+        # Đọc dữ liệu với xử lý BOM (utf-8-sig)
         if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(io.BytesIO(content), encoding='utf-8-sig')
         else:
             df = pd.read_excel(io.BytesIO(content))
+
+        print(f"Các cột nhận được: {df.columns.tolist()}")
 
         # Các cột bắt buộc
         required = ["title", "author", "isbn"]
         for col in required:
             if col not in df.columns:
-                raise HTTPException(status_code=400, detail=f"File thiếu cột bắt buộc: {col}")
+                print(f"LỖI: Thiếu cột {col}")
+                raise HTTPException(status_code=400, detail=f"File thiếu cột bắt buộc: {col}. Các cột hiện có: {df.columns.tolist()}")
 
-        # Map Khu vực (Khớp với dữ liệu thực tế trong DB của bạn)
+        # 1. CACHE: Tải toàn bộ Category và Location vào bộ nhớ để tránh query liên tục
+        categories_cache = {c.name.strip(): c.id for c in db.execute(text("SELECT name, category_id as id FROM categories")).fetchall()}
+        
+        # Cache location theo key "zone|shelf|level"
+        locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
+        locations_cache = {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
+
         zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
-
+        
+        books_to_add = []
         count = 0
+        
+        print(f"Đang xử lý {len(df)} dòng dữ liệu...")
+
         for _, row in df.iterrows():
             if pd.isna(row["title"]): continue
             
-            # 1. Xử lý Thể loại (Genre)
-            cat_id = None
+            # Xử lý Thể loại (Gộp và tạo mới nếu cần)
             genre_name = str(row.get("genre", "Chưa phân loại")).strip()
-            category = db.query(models.Category).filter(models.Category.name == genre_name).first()
-            if not category:
-                category = models.Category(name=genre_name)
-                db.add(category)
+            cat_id = categories_cache.get(genre_name)
+            if not cat_id:
+                # Nếu chưa có trong cache, tạo mới trong DB
+                new_cat = models.Category(name=genre_name)
+                db.add(new_cat)
                 db.flush()
-            cat_id = category.category_id
+                cat_id = new_cat.category_id
+                categories_cache[genre_name] = cat_id
 
-            # 2. Xử lý Vị trí (location_code: K1-T1-H1-V1)
+            # Xử lý Vị trí
             loc_id = None
             pos_in_row = None
             loc_code = str(row.get("location_code", ""))
             if loc_code and "-" in loc_code:
                 parts = loc_code.split("-")
-                # parts[0]=K1, parts[1]=T1, parts[2]=H1, parts[3]=V1
-                z_code = zone_map.get(parts[0], parts[0]) 
-                s_id = parts[1].replace("T", "Ke ") # Khớp với "Ke 1" trong DB
+                z_name = zone_map.get(parts[0], parts[0])
+                s_id = parts[1].replace("T", "Ke ")
                 l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
                 if len(parts) > 3:
                     pos_in_row = int(parts[3].replace("V", ""))
                 
-                location = db.query(models.Location).filter(
-                    models.Location.zone_name == z_code,
-                    models.Location.shelf_id == s_id,
-                    models.Location.level_number == l_num
-                ).first()
-                if location:
-                    loc_id = location.location_id
+                loc_key = f"{z_name}|{s_id}|{l_num}"
+                loc_id = locations_cache.get(loc_key)
 
-            # 3. Tạo sách
-            db.add(models.Book(
+            # Tạo đối tượng sách (chưa lưu vào DB vội)
+            books_to_add.append(models.Book(
                 isbn=str(row["isbn"]),
                 title=str(row["title"]),
                 author=str(row["author"]),
@@ -390,10 +400,24 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             ))
             count += 1
             
+            # Lưu theo đợt (batch 500 cuốn) để tránh quá tải
+            if len(books_to_add) >= 500:
+                db.bulk_save_objects(books_to_add)
+                books_to_add = []
+
+        # Lưu nốt số còn lại
+        if books_to_add:
+            db.bulk_save_objects(books_to_add)
+            
         db.commit()
+        print(f"✅ Đã nhập thành công {count} cuốn sách!")
         return {"message": f"Đã nhập thành công {count} cuốn sách!", "count": count}
+        
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
+        print(f"❌ LỖI NGHIÊM TRỌNG: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi nhập file: {str(e)}")
 
 
