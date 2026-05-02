@@ -355,13 +355,16 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
 
             # 2. Xử lý Vị trí (location_code: K1-T1-H1-V1)
             loc_id = None
+            pos_in_row = None
             loc_code = str(row.get("location_code", ""))
             if loc_code and "-" in loc_code:
                 parts = loc_code.split("-")
-                # parts[0] = K1, parts[1] = T1, parts[2] = H1
+                # parts[0]=K1, parts[1]=T1, parts[2]=H1, parts[3]=V1
                 z_code = zone_map.get(parts[0])
                 s_id = parts[1].replace("T", "Kệ ")
                 l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
+                if len(parts) > 3:
+                    pos_in_row = int(parts[3].replace("V", ""))
                 
                 location = db.query(models.Location).filter(
                     models.Location.zone_name == z_code,
@@ -376,10 +379,13 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                 isbn=str(row["isbn"]),
                 title=str(row["title"]),
                 author=str(row["author"]),
+                description=str(row.get("description", "")),
+                pages=int(row.get("pages", 0)) if not pd.isna(row.get("pages")) else None,
+                market_price=float(row.get("price", 50000)) if not pd.isna(row.get("price")) else 50000,
                 image_url=str(row.get("image_url", "")),
                 category_id=cat_id,
                 location_id=loc_id,
-                market_price=50000, # Giá mặc định nếu ko có
+                position_in_row=pos_in_row,
                 status="available"
             ))
             count += 1
@@ -845,27 +851,35 @@ def get_user_activity(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/locations", response_model=List[schemas.LocationWithCount])
 def get_locations(db: Session = Depends(get_db)):
-    """Lấy danh sách các kệ sách và thống kê sách độc nhất trên mỗi kệ."""
+    """Lấy danh sách các kệ sách và thống kê sách đại diện trên mỗi kệ."""
     locations = db.query(models.Location).order_by(models.Location.zone_name, models.Location.shelf_id, models.Location.level_number).all()
     result = []
     for loc in locations:
-        # Tổng số lượng sách
+        # Tổng số lượng sách trên tầng này
         total_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id).count()
         
-        # Thống kê sách độc nhất (Unique Books)
-        unique_books_query = db.query(
-            models.Book.isbn,
-            models.Book.title,
-            models.Book.image_url,
-            func.count(models.Book.book_id).label("count")
-        ).filter(models.Book.location_id == loc.location_id).group_by(
-            models.Book.isbn, models.Book.title, models.Book.image_url
-        ).all()
+        # Thống kê sách đại diện (Gộp theo ISBN)
+        # Lấy danh sách các ISBN duy nhất trên kệ này
+        unique_isbns = db.query(models.Book.isbn).filter(models.Book.location_id == loc.location_id).distinct().all()
         
-        unique_books = [
-            {"isbn": b.isbn, "title": b.title, "image_url": b.image_url, "count": b.count}
-            for b in unique_books_query
-        ]
+        unique_books = []
+        for (isbn,) in unique_isbns:
+            # Lấy thông tin cuốn đầu tiên làm đại diện
+            rep_book = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn).first()
+            
+            # Đếm số lượng theo trạng thái
+            total_copies = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn).count()
+            available_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn, models.Book.status == "available").count()
+            borrowed_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn, models.Book.status == "borrowed").count()
+            
+            unique_books.append({
+                "isbn": isbn,
+                "title": rep_book.title,
+                "image_url": rep_book.image_url,
+                "total_copies": total_copies,
+                "available_count": available_count,
+                "borrowed_count": borrowed_count
+            })
 
         result.append({
             "location_id": loc.location_id,

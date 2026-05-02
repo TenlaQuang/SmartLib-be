@@ -49,6 +49,9 @@ class BookBase(BaseModel):
     image_url: Optional[str] = None
     category_id: Optional[int] = None
     location_id: Optional[int] = None
+    description: Optional[str] = None
+    pages: Optional[int] = None
+    position_in_row: Optional[int] = None
 
 class BookCreate(BookBase):
     pass
@@ -65,6 +68,9 @@ class BookUpdate(BaseModel):
     image_url: Optional[str] = None
     category_id: Optional[int] = None
     location_id: Optional[int] = None
+    description: Optional[str] = None
+    pages: Optional[int] = None
+    position_in_row: Optional[int] = None
 
 class BookResponse(BookBase):
     book_id: int
