@@ -320,14 +320,13 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.post("/api/books/import-csv")
 async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Nhập sách hàng loạt với cơ chế tự động sửa lỗi định dạng (Ultra Resilient)."""
+    """Nhập sách hàng loạt với cơ chế an toàn tuyệt đối (Ultra-Safe)."""
     try:
         content = await file.read()
         filename = file.filename.lower()
-        print(f"--- Nhận file: {filename} ({len(content)} bytes) ---")
+        print(f"--- [START] Import file: {filename} ({len(content)} bytes) ---")
         
         df = None
-        # Thử đọc với nhiều loại mã hóa khác nhau
         for encoding in ['utf-8-sig', 'cp1252', 'latin1', 'utf-8']:
             try:
                 if filename.endswith('.csv'):
@@ -335,25 +334,19 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                 else:
                     df = pd.read_excel(io.BytesIO(content))
                 
-                # Thử chuẩn hóa cột để kiểm tra xem đã đọc đúng chưa
                 test_cols = [str(c).strip().lower() for c in df.columns]
                 if "title" in test_cols:
-                    print(f"✅ Đọc thành công với encoding: {encoding}")
                     df.columns = test_cols
                     break
-            except:
-                continue
+            except: continue
         
         if df is None or "title" not in df.columns:
-            print(f"❌ KHÔNG THỂ ĐỌC FILE. Cột hiện có: {df.columns.tolist() if df is not None else 'None'}")
-            raise HTTPException(status_code=400, detail="Không thể nhận diện tiêu đề cột. Vui lòng kiểm tra lại file CSV.")
+            raise HTTPException(status_code=400, detail="Không thể nhận diện tiêu đề cột.")
 
-        # 1. CACHE DATA
+        # Cache dữ liệu để tăng tốc
         categories_cache = {c.name.strip(): c.id for c in db.execute(text("SELECT name, category_id as id FROM categories")).fetchall()}
         locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
         locations_cache = {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
-
-        # Tải toàn bộ ISBN hiện có để tránh trùng lặp
         existing_isbns = {row[0] for row in db.execute(text("SELECT isbn FROM books")).fetchall()}
 
         zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
@@ -361,72 +354,86 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
         count = 0
         skipped = 0
 
-        for _, row in df.iterrows():
-            if pd.isna(row["title"]): continue
-            
-            isbn = str(row.get("isbn", _generate_isbn(db))).strip()
-            # Bỏ qua nếu ISBN đã tồn tại
-            if isbn in existing_isbns:
-                skipped += 1
-                continue
-            
-            # Category
-            genre_name = str(row.get("genre", "Chưa phân loại")).strip()
-            cat_id = categories_cache.get(genre_name)
-            if not cat_id:
-                new_cat = models.Category(name=genre_name)
-                db.add(new_cat)
-                db.flush()
-                cat_id = new_cat.category_id
-                categories_cache[genre_name] = cat_id
+        # Hàm phụ chuyển đổi an toàn
+        def safe_int(val):
+            try: return int(float(val)) if not pd.isna(val) else None
+            except: return None
+        
+        def safe_float(val, default=0.0):
+            try: return float(val) if not pd.isna(val) else default
+            except: return default
 
-            # Location
-            loc_id = None
-            pos_in_row = None
-            loc_code = str(row.get("location_code", ""))
-            if loc_code and "-" in loc_code:
-                parts = loc_code.split("-")
-                z_name = zone_map.get(parts[0], parts[0])
-                s_id = parts[1].replace("T", "Ke ")
-                l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
-                if len(parts) > 3:
-                    pos_in_row = int(parts[3].replace("V", ""))
+        print(f"Đang xử lý {len(df)} cuốn sách...")
+
+        for index, row in df.iterrows():
+            try:
+                title = str(row["title"]).strip()
+                if not title or title == "nan": continue
                 
-                loc_id = locations_cache.get(f"{z_name}|{s_id}|{l_num}")
+                isbn = str(row.get("isbn", _generate_isbn(db))).strip()
+                if isbn in existing_isbns:
+                    skipped += 1
+                    continue
+                
+                # Thể loại
+                genre_name = str(row.get("genre", "Chưa phân loại")).strip()
+                cat_id = categories_cache.get(genre_name)
+                if not cat_id:
+                    new_cat = models.Category(name=genre_name)
+                    db.add(new_cat)
+                    db.flush()
+                    cat_id = new_cat.category_id
+                    categories_cache[genre_name] = cat_id
 
-            # Thêm sách vào hàng đợi
-            books_to_add.append(models.Book(
-                isbn=isbn,
-                title=str(row["title"]),
-                author=str(row.get("author", "Chưa rõ")),
-                description=str(row.get("description", "")),
-                pages=int(row.get("pages")) if not pd.isna(row.get("pages")) else None,
-                market_price=float(row.get("price", 0)) if not pd.isna(row.get("price")) else 0,
-                image_url=str(row.get("image_url", "")),
-                category_id=cat_id,
-                location_id=loc_id,
-                position_in_row=pos_in_row,
-                status="available"
-            ))
-            count += 1
-            existing_isbns.add(isbn) # Đánh dấu đã thêm để không trùng trong chính file đó
-            
-            if len(books_to_add) >= 500:
-                db.bulk_save_objects(books_to_add)
-                books_to_add = []
+                # Vị trí
+                loc_id = None
+                pos_in_row = None
+                loc_code = str(row.get("location_code", ""))
+                if loc_code and "-" in loc_code:
+                    parts = loc_code.split("-")
+                    z_name = zone_map.get(parts[0], parts[0])
+                    s_id = parts[1].replace("T", "Ke ")
+                    l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
+                    if len(parts) > 3:
+                        pos_in_row = safe_int(parts[3].replace("V", ""))
+                    loc_id = locations_cache.get(f"{z_name}|{s_id}|{l_num}")
+
+                books_to_add.append(models.Book(
+                    isbn=isbn,
+                    title=title,
+                    author=str(row.get("author", "Chưa rõ")),
+                    description=str(row.get("description", "")),
+                    pages=safe_int(row.get("pages")),
+                    market_price=safe_float(row.get("price")),
+                    image_url=str(row.get("image_url", "")),
+                    category_id=cat_id,
+                    location_id=loc_id,
+                    position_in_row=pos_in_row,
+                    status="available"
+                ))
+                count += 1
+                existing_isbns.add(isbn)
+                
+                # Lưu theo lô nhỏ hơn (100 cuốn) để an toàn
+                if len(books_to_add) >= 100:
+                    db.bulk_save_objects(books_to_add)
+                    books_to_add = []
+                    db.commit() # Commit từng đợt để giải phóng bộ nhớ
+            except Exception as row_err:
+                print(f"Bỏ qua dòng {index} ({row.get('title')}): {str(row_err)}")
+                continue
 
         if books_to_add:
             db.bulk_save_objects(books_to_add)
+            db.commit()
             
-        db.commit()
-        print(f"--- Đã nhập xong {count} cuốn (Bỏ qua {skipped} cuốn trùng) ---")
-        return {"message": f"Thành công! Đã nhập {count} cuốn sách. (Bỏ qua {skipped} cuốn đã có)", "count": count}
+        print(f"--- [DONE] Thành công: {count}, Bỏ qua: {skipped} ---")
+        return {"message": f"Đã nhập thành công {count} cuốn sách. (Bỏ qua {skipped} cuốn đã có)", "count": count}
 
-    except HTTPException: raise
     except Exception as e:
         db.rollback()
-        print(f"Lỗi hệ thống: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"CRITICAL ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi nhập file: {str(e)}")
 
 
 @app.post("/api/books/import-excel")
