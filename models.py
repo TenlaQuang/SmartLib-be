@@ -43,7 +43,7 @@ class Book(Base):
     __tablename__ = "books"
 
     book_id = Column(Integer, primary_key=True, index=True)
-    isbn = Column(String(50), unique=True, index=True)
+    isbn = Column(String(50), index=True)
     title = Column(String(1000), index=True)
     author = Column(String(1000), index=True)
     category_id = Column(Integer, ForeignKey("categories.category_id"))

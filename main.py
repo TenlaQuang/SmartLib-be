@@ -5,7 +5,7 @@ import os
 import io
 import time
 import random
-from typing import List
+from typing import List, Optional, Union
 
 import cloudinary
 import cloudinary.uploader
@@ -34,11 +34,19 @@ cloudinary.config(
     secure=True,
 )
 
-payos_client = PayOS(
-    client_id=os.getenv("PAYOS_CLIENT_ID", ""),
-    api_key=os.getenv("PAYOS_API_KEY", ""),
-    checksum_key=os.getenv("PAYOS_CHECKSUM_KEY", ""),
-)
+from dotenv import load_dotenv
+load_dotenv()
+
+# Khởi tạo PayOS (Bọc trong try-except để không bị crash nếu thiếu biến môi trường)
+try:
+    payos_client = PayOS(
+        client_id=os.getenv("PAYOS_CLIENT_ID", ""),
+        api_key=os.getenv("PAYOS_API_KEY", ""),
+        checksum_key=os.getenv("PAYOS_CHECKSUM_KEY", ""),
+    )
+except Exception as e:
+    print(f"⚠️ Cảnh báo: Không thể khởi tạo PayOS ({e}). Chức năng thanh toán sẽ không hoạt động.")
+    payos_client = None
 
 BACKEND_URL = os.getenv("BACKEND_URL", "https://smartlib-be.onrender.com")
 CARD_FEE = int(os.getenv("CARD_FEE", "10000"))  # Phí làm thẻ (VND)
@@ -152,9 +160,43 @@ def test_db(db: Session = Depends(get_db)):
 # ==============================================================================
 # Books
 # ==============================================================================
-@app.get("/api/books", response_model=List[schemas.BookResponse])
-def get_books(db: Session = Depends(get_db), limit: int = 100):
-    return db.query(models.Book).limit(limit).all()
+from sqlalchemy.orm import joinedload
+
+@app.get("/api/books", response_model=schemas.PaginatedBookResponse)
+def get_books(
+    page: int = 1, 
+    page_size: int = 20, 
+    search: Optional[str] = None, 
+    category_id: Optional[int] = None, 
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Book).options(
+        joinedload(models.Book.category),
+        joinedload(models.Book.location)
+    )
+    
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (models.Book.title.ilike(search_filter)) | 
+            (models.Book.author.ilike(search_filter)) |
+            (models.Book.isbn.ilike(search_filter))
+        )
+        
+    if category_id:
+        query = query.filter(models.Book.category_id == category_id)
+        
+    total_books = query.count()
+    
+    skip = (page - 1) * page_size
+    books = query.order_by(models.Book.book_id.desc()).offset(skip).limit(page_size).all()
+    
+    return {
+        "total": total_books,
+        "page": page,
+        "page_size": page_size,
+        "data": books
+    }
 
 
 @app.get("/api/books/title-groups")
@@ -345,14 +387,20 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
 
         # Cache dữ liệu để tăng tốc
         categories_cache = {c.name.strip(): c.id for c in db.execute(text("SELECT name, category_id as id FROM categories")).fetchall()}
-        locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
-        locations_cache = {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
-        existing_isbns = {row[0] for row in db.execute(text("SELECT isbn FROM books")).fetchall()}
+        
+        # Cache location theo key "zone|shelf|level"
+        def refresh_locations_cache():
+            locations_query = db.execute(text("SELECT location_id, zone_name, shelf_id, level_number FROM locations")).fetchall()
+            return {f"{l.zone_name}|{l.shelf_id}|{l.level_number}": l.location_id for l in locations_query}
+        
+        locations_cache = refresh_locations_cache()
+        
+        # Đếm số lượng sách hiện có trên mỗi kệ
+        loc_counts = {row[0]: row[1] for row in db.execute(text("SELECT location_id, COUNT(*) FROM books WHERE location_id IS NOT NULL GROUP BY location_id")).fetchall()}
 
-        zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "C", "K4": "D", "K5": "E"}
+        zone_map = {"K1": "Khu A", "K2": "Khu B", "K3": "Khu C", "K4": "Khu D", "K5": "Khu E"}
         books_to_add = []
         count = 0
-        skipped = 0
 
         # Hàm phụ chuyển đổi an toàn
         def safe_int(val):
@@ -363,7 +411,7 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             try: return float(val) if not pd.isna(val) else default
             except: return default
 
-        print(f"Đang xử lý {len(df)} cuốn sách...")
+        print(f"Bắt đầu xử lý {len(df)} dòng dữ liệu...")
 
         for index, row in df.iterrows():
             try:
@@ -371,9 +419,6 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                 if not title or title == "nan": continue
                 
                 isbn = str(row.get("isbn", _generate_isbn(db))).strip()
-                if isbn in existing_isbns:
-                    skipped += 1
-                    continue
                 
                 # Thể loại
                 genre_name = str(row.get("genre", "Chưa phân loại")).strip()
@@ -385,18 +430,36 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                     cat_id = new_cat.category_id
                     categories_cache[genre_name] = cat_id
 
-                # Vị trí
+                # Vị trí & Tự động tạo Kệ
                 loc_id = None
-                pos_in_row = None
                 loc_code = str(row.get("location_code", ""))
+                loc_key = ""
+                
                 if loc_code and "-" in loc_code:
                     parts = loc_code.split("-")
                     z_name = zone_map.get(parts[0], parts[0])
                     s_id = parts[1].replace("T", "Ke ")
-                    l_num = int(parts[2].replace("H", "")) if len(parts) > 2 else 1
-                    if len(parts) > 3:
-                        pos_in_row = safe_int(parts[3].replace("V", ""))
-                    loc_id = locations_cache.get(f"{z_name}|{s_id}|{l_num}")
+                    l_num = safe_int(parts[2].replace("H", "")) or 1
+                    
+                    loc_key = f"{z_name}|{s_id}|{l_num}"
+                    loc_id = locations_cache.get(loc_key)
+                    
+                    # Nếu chưa có kệ này, TỰ ĐỘNG TẠO LUÔN
+                    if not loc_id:
+                        print(f"Đang tự động tạo kệ mới: {loc_key}")
+                        new_loc = models.Location(zone_name=z_name, shelf_id=s_id, level_number=l_num)
+                        db.add(new_loc)
+                        db.flush()
+                        loc_id = new_loc.location_id
+                        locations_cache[loc_key] = loc_id # Cập nhật cache
+                        loc_counts[loc_id] = 0
+
+                # Kiểm tra giới hạn số lượng trên kệ (Tối đa 50)
+                if loc_id:
+                    if loc_counts.get(loc_id, 0) >= 50:
+                        print(f"Bỏ qua sách '{title}': Kệ {loc_key} đã đạt tối đa 50 cuốn.")
+                        continue
+                    loc_counts[loc_id] = loc_counts.get(loc_id, 0) + 1
 
                 books_to_add.append(models.Book(
                     isbn=isbn,
@@ -408,27 +471,25 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
                     image_url=str(row.get("image_url", "")),
                     category_id=cat_id,
                     location_id=loc_id,
-                    position_in_row=pos_in_row,
+                    position_in_row=None, # Đã loại bỏ logic vị trí chi tiết để dễ quản lý hơn
                     status="available"
                 ))
                 count += 1
-                existing_isbns.add(isbn)
                 
-                # Lưu theo lô nhỏ hơn (100 cuốn) để an toàn
-                if len(books_to_add) >= 100:
+                if len(books_to_add) >= 200:
                     db.bulk_save_objects(books_to_add)
                     books_to_add = []
-                    db.commit() # Commit từng đợt để giải phóng bộ nhớ
+                    db.commit()
             except Exception as row_err:
-                print(f"Bỏ qua dòng {index} ({row.get('title')}): {str(row_err)}")
+                print(f"Lỗi dòng {index}: {row_err}")
                 continue
 
         if books_to_add:
             db.bulk_save_objects(books_to_add)
             db.commit()
             
-        print(f"--- [DONE] Thành công: {count}, Bỏ qua: {skipped} ---")
-        return {"message": f"Đã nhập thành công {count} cuốn sách. (Bỏ qua {skipped} cuốn đã có)", "count": count}
+        print(f"--- THÀNH CÔNG: Đã nhập {count} cuốn sách lên kệ! ---")
+        return {"message": f"Thành công! Đã nhập {count} cuốn sách lên kệ.", "count": count}
 
     except Exception as e:
         db.rollback()
@@ -471,10 +532,6 @@ async def import_books_excel(file: UploadFile = File(...), db: Session = Depends
 # ==============================================================================
 # Locations
 # ==============================================================================
-@app.get("/api/locations", response_model=List[schemas.Location])
-def get_locations(db: Session = Depends(get_db)):
-    return db.query(models.Location).all()
-
 
 @app.post("/api/locations", response_model=schemas.Location)
 def create_location(loc_in: schemas.LocationCreate, db: Session = Depends(get_db)):
@@ -890,36 +947,39 @@ def get_user_activity(user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/locations", response_model=List[schemas.LocationWithCount])
 def get_locations(db: Session = Depends(get_db)):
-    """Lấy danh sách các kệ sách và thống kê sách đại diện trên mỗi kệ."""
+    """Lấy danh sách các kệ sách và thống kê sách đại diện siêu tối ưu."""
     locations = db.query(models.Location).order_by(models.Location.zone_name, models.Location.shelf_id, models.Location.level_number).all()
+    
+    # 1 Lệnh SQL duy nhất để gộp nhóm, đếm số lượng cho toàn bộ thư viện thay vì hàng ngàn vòng lặp
+    books_with_loc = db.execute(text("""
+        SELECT location_id, isbn, MAX(title) as title, MAX(image_url) as image_url, 
+               COUNT(*) as total_copies,
+               SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available_count,
+               SUM(CASE WHEN status = 'borrowed' THEN 1 ELSE 0 END) as borrowed_count
+        FROM books
+        WHERE location_id IS NOT NULL
+        GROUP BY location_id, isbn
+    """)).fetchall()
+
+    books_by_loc = {}
+    for r in books_with_loc:
+        loc_id = r.location_id
+        if loc_id not in books_by_loc:
+            books_by_loc[loc_id] = []
+        books_by_loc[loc_id].append({
+            "isbn": r.isbn,
+            "title": r.title,
+            "image_url": r.image_url,
+            "total_copies": r.total_copies,
+            "available_count": r.available_count or 0,
+            "borrowed_count": r.borrowed_count or 0
+        })
+
     result = []
     for loc in locations:
-        # Tổng số lượng sách trên tầng này
-        total_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id).count()
+        loc_books = books_by_loc.get(loc.location_id, [])
+        total_count = sum(b['total_copies'] for b in loc_books)
         
-        # Thống kê sách đại diện (Gộp theo ISBN)
-        # Lấy danh sách các ISBN duy nhất trên kệ này
-        unique_isbns = db.query(models.Book.isbn).filter(models.Book.location_id == loc.location_id).distinct().all()
-        
-        unique_books = []
-        for (isbn,) in unique_isbns:
-            # Lấy thông tin cuốn đầu tiên làm đại diện
-            rep_book = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn).first()
-            
-            # Đếm số lượng theo trạng thái
-            total_copies = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn).count()
-            available_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn, models.Book.status == "available").count()
-            borrowed_count = db.query(models.Book).filter(models.Book.location_id == loc.location_id, models.Book.isbn == isbn, models.Book.status == "borrowed").count()
-            
-            unique_books.append({
-                "isbn": isbn,
-                "title": rep_book.title,
-                "image_url": rep_book.image_url,
-                "total_copies": total_copies,
-                "available_count": available_count,
-                "borrowed_count": borrowed_count
-            })
-
         result.append({
             "location_id": loc.location_id,
             "zone_name": loc.zone_name,
@@ -927,7 +987,7 @@ def get_locations(db: Session = Depends(get_db)):
             "level_number": loc.level_number,
             "max_capacity": loc.max_capacity,
             "book_count": total_count,
-            "unique_books": unique_books
+            "unique_books": loc_books
         })
     return result
 

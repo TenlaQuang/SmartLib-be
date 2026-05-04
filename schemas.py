@@ -41,14 +41,14 @@ class BookBase(BaseModel):
     isbn: str
     title: str
     author: Optional[str] = None
-    status: Optional[str] = "available"
-    market_price: Decimal
-    rental_rate_percent: Optional[Decimal] = Decimal("1.0")
-    fine_rate_percent: Optional[Decimal] = Decimal("2.0")
-    deposit_required: Optional[Decimal] = None
-    image_url: Optional[str] = None
     category_id: Optional[int] = None
     location_id: Optional[int] = None
+    market_price: float = 0.0
+    rental_rate_percent: float = 1.0
+    fine_rate_percent: float = 2.0
+    deposit_required: bool = True
+    status: str = "available"
+    image_url: Optional[str] = None
     description: Optional[str] = None
     pages: Optional[int] = None
     position_in_row: Optional[int] = None
@@ -60,14 +60,14 @@ class BookUpdate(BaseModel):
     isbn: Optional[str] = None
     title: Optional[str] = None
     author: Optional[str] = None
-    status: Optional[str] = None
-    market_price: Optional[Decimal] = None
-    rental_rate_percent: Optional[Decimal] = None
-    fine_rate_percent: Optional[Decimal] = None
-    deposit_required: Optional[Decimal] = None
-    image_url: Optional[str] = None
     category_id: Optional[int] = None
     location_id: Optional[int] = None
+    market_price: Optional[float] = None
+    rental_rate_percent: Optional[float] = None
+    fine_rate_percent: Optional[float] = None
+    deposit_required: Optional[bool] = None
+    status: Optional[str] = None
+    image_url: Optional[str] = None
     description: Optional[str] = None
     pages: Optional[int] = None
     position_in_row: Optional[int] = None
@@ -79,6 +79,12 @@ class BookResponse(BookBase):
 
     class Config:
         from_attributes = True
+
+class PaginatedBookResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    data: List[BookResponse]
 
 # --- Registration Schemas ---
 class PayosLinkCreate(BaseModel):
