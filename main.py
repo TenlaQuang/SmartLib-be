@@ -199,6 +199,41 @@ def get_books(
     }
 
 
+from datetime import datetime, timedelta
+
+@app.get("/api/books/featured-weekly", response_model=List[schemas.BookResponse])
+def get_featured_weekly(db: Session = Depends(get_db)):
+    """Lấy danh sách sách được mượn nhiều nhất trong tuần qua."""
+    last_week = datetime.utcnow() - timedelta(days=7)
+    
+    # Đếm số lượt mượn của mỗi cuốn sách trong tuần qua
+    top_borrows = db.query(
+        models.Transaction.book_id,
+        func.count(models.Transaction.transaction_id).label('borrow_count')
+    ).filter(
+        models.Transaction.borrow_date >= last_week
+    ).group_by(
+        models.Transaction.book_id
+    ).order_by(
+        text('borrow_count DESC')
+    ).limit(10).all()
+    
+    if not top_borrows:
+        return []
+    
+    book_ids = [t.book_id for t in top_borrows]
+    books = db.query(models.Book).options(
+        joinedload(models.Book.category),
+        joinedload(models.Book.location)
+    ).filter(
+        models.Book.book_id.in_(book_ids)
+    ).all()
+    
+    # Giữ nguyên thứ tự ưu tiên mượn nhiều nhất
+    book_map = {b.book_id: b for b in books}
+    return [book_map[bid] for bid in book_ids if bid in book_map]
+
+
 @app.get("/api/books/title-groups")
 def get_book_title_groups(q: Optional[str] = None, category_id: Optional[int] = None, db: Session = Depends(get_db)):
     """Trả về danh sách NHÓM ĐẦU SÁCH kèm thống kê Mượn/Trả và tìm kiếm."""
