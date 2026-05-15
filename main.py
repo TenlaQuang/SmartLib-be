@@ -1454,3 +1454,55 @@ def update_return_request_status(request_id: int, payload: dict, db: Session = D
     req.status = status
     db.commit()
     return {"message": "Cập nhật trạng thái thành công"}
+
+# ==============================================================================
+# Recommendations
+# ==============================================================================
+@app.get("/api/recommendations/user-centric/{user_id}")
+def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)):
+    """
+    Collaborative Filtering: Recommend books based on similar users' behaviors.
+    """
+    # Step 1: Check if the current user has any transaction history
+    has_history_query = text("SELECT 1 FROM transactions WHERE user_id = :uid LIMIT 1")
+    has_history = db.execute(has_history_query, {"uid": user_id}).fetchone()
+    
+    if not has_history:
+        # User has no history -> Return empty list immediately
+        return []
+        
+    # Steps 2-5: Optimized User-to-User CF query using raw SQL
+    cf_query = text("""
+        SELECT b.book_id, b.title, b.author, b.image_url
+        FROM transactions t
+        JOIN books b ON t.book_id = b.book_id
+        WHERE t.user_id IN (
+            -- Step 2: Similar Users (have borrowed at least one book in common with current user)
+            SELECT DISTINCT t2.user_id 
+            FROM transactions t1
+            JOIN transactions t2 ON t1.book_id = t2.book_id
+            WHERE t1.user_id = :uid AND t2.user_id != :uid
+        )
+        -- Step 3: Candidate Generation (Books NOT borrowed by the current user yet)
+        AND t.book_id NOT IN (
+            SELECT book_id FROM transactions WHERE user_id = :uid
+        )
+        -- Step 4: Ranking (Count frequency of these books among similar users)
+        GROUP BY b.book_id, b.title, b.author, b.image_url
+        ORDER BY COUNT(DISTINCT t.user_id) DESC
+        -- Step 5: Final Result limit
+        LIMIT 5;
+    """)
+    
+    result = db.execute(cf_query, {"uid": user_id}).fetchall()
+    
+    # Map to list of dicts to return as JSON
+    return [
+        {
+            "book_id": row[0],
+            "title": row[1],
+            "author": row[2],
+            "image_url": row[3]
+        }
+        for row in result
+    ]
