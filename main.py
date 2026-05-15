@@ -23,6 +23,7 @@ from database import get_db
 import models
 import schemas
 import email_utils
+import recommender
 
 # ==============================================================================
 # Cấu hình dịch vụ bên ngoài
@@ -445,7 +446,7 @@ def get_book(book_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/books", response_model=schemas.BookResponse)
-def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
+def create_book(book_in: schemas.BookCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Kiểm tra sức chứa của vị trí
     if book_in.location_id:
         loc = db.query(models.Location).filter(models.Location.location_id == book_in.location_id).first()
@@ -458,6 +459,7 @@ def create_book(book_in: schemas.BookCreate, db: Session = Depends(get_db)):
     db.add(new_book)
     _commit_or_rollback(db)
     db.refresh(new_book)
+    background_tasks.add_task(run_recommender_task)
     return new_book
 
 
@@ -535,7 +537,7 @@ def get_categories(db: Session = Depends(get_db)):
     return db.query(models.Category).all()
 
 @app.post("/api/books/import-csv")
-async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_books_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Nhập sách hàng loạt với cơ chế an toàn tuyệt đối (Ultra-Safe)."""
     try:
         content = await file.read()
@@ -662,6 +664,7 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
             db.bulk_save_objects(books_to_add)
             db.commit()
             
+        background_tasks.add_task(run_recommender_task)
         print(f"--- THÀNH CÔNG: Đã nhập {count} cuốn sách lên kệ! ---")
         return {"message": f"Thành công! Đã nhập {count} cuốn sách lên kệ.", "count": count}
 
@@ -672,7 +675,7 @@ async def import_books_csv(file: UploadFile = File(...), db: Session = Depends(g
 
 
 @app.post("/api/books/import-excel")
-async def import_books_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_books_excel(background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Nhập sách hàng loạt từ Excel. Cột bắt buộc: title, market_price. Tùy chọn: quantity."""
     try:
         df = pd.read_excel(io.BytesIO(await file.read()))
@@ -695,6 +698,7 @@ async def import_books_excel(file: UploadFile = File(...), db: Session = Depends
                 count += 1
 
         db.commit()
+        background_tasks.add_task(run_recommender_task)
         return {"message": f"Nhập thành công {count} cuốn sách."}
     except HTTPException:
         raise
@@ -1492,6 +1496,17 @@ def update_return_request_status(request_id: int, payload: dict, db: Session = D
 # ==============================================================================
 # Recommendations
 # ==============================================================================
+def run_recommender_task():
+    try:
+        recommender.main()
+    except Exception as e:
+        print(f"Lỗi khi cập nhật gợi ý sách: {e}")
+
+@app.post("/api/recommendations/update")
+def update_recommendations(background_tasks: BackgroundTasks):
+    background_tasks.add_task(run_recommender_task)
+    return {"message": "Đang chạy cập nhật hệ thống gợi ý sách ngầm..."}
+
 @app.get("/api/recommendations/user-centric/{user_id}")
 def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)):
     """
