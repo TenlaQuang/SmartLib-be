@@ -197,3 +197,25 @@ class UserActivityResponse(BaseModel):
     ongoing_books: List[TransactionResponse]
     completed_count: int
     history: List[TransactionResponse]
+
+# --- Borrow Request Schemas ---
+class BorrowRequestCreate(BaseModel):
+    user_id: int
+    isbns: List[str]
+
+class BorrowRequestDetailResponse(BaseModel):
+    detail_id: int
+    isbn: str
+
+    class Config:
+        from_attributes = True
+
+class BorrowRequestResponse(BaseModel):
+    request_id: int
+    user_id: int
+    status: str
+    created_at: datetime
+    details: List[BorrowRequestDetailResponse]
+
+    class Config:
+        from_attributes = True

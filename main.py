@@ -1179,3 +1179,42 @@ def lock_user_nfc(user_id: int, background_tasks: BackgroundTasks, db: Session =
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==============================================================================
+# Borrow Requests
+# ==============================================================================
+@app.post("/api/borrow-requests", response_model=schemas.BorrowRequestResponse)
+def create_borrow_request(request_in: schemas.BorrowRequestCreate, db: Session = Depends(get_db)):
+    """Lưu yêu cầu mượn sách từ mobile app."""
+    try:
+        # Kiểm tra user có tồn tại không
+        user = db.query(models.User).filter(models.User.user_id == request_in.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+
+        # Tạo request
+        db_request = models.BorrowRequest(
+            user_id=request_in.user_id,
+            status="pending"
+        )
+        db.add(db_request)
+        db.commit()
+        db.refresh(db_request)
+
+        # Thêm các cuốn sách (details)
+        for isbn in request_in.isbns:
+            detail = models.BorrowRequestDetail(
+                request_id=db_request.request_id,
+                isbn=isbn
+            )
+            db.add(detail)
+        
+        db.commit()
+        db.refresh(db_request)
+        return db_request
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu yêu cầu mượn sách: {str(e)}")

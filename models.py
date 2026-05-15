@@ -121,3 +121,22 @@ class Transaction(Base):
     total_fee = Column(Numeric(12, 2), default=0)
     refund_amount = Column(Numeric(12, 2), default=0)
     status = Column(String(20), default="ongoing")
+
+class BorrowRequest(Base):
+    __tablename__ = "borrow_requests"
+
+    request_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    status = Column(String(20), default="pending") # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    details = relationship("BorrowRequestDetail", back_populates="request", cascade="all, delete-orphan")
+
+class BorrowRequestDetail(Base):
+    __tablename__ = "borrow_request_details"
+
+    detail_id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("borrow_requests.request_id", ondelete="CASCADE"), nullable=False)
+    isbn = Column(String(50), nullable=False)
+
+    request = relationship("BorrowRequest", back_populates="details")
