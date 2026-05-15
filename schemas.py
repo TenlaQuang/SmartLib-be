@@ -239,3 +239,35 @@ class ReturnRequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- Comment Schemas ---
+class CommentBase(BaseModel):
+    book_id: int
+    user_id: int
+    content: str
+    rating: int = 5
+
+class CommentCreate(CommentBase):
+    pass
+
+class CommentResponse(CommentBase):
+    comment_id: int
+    created_at: datetime
+    user_name: Optional[str] = None # Helper field to show user name
+
+    class Config:
+        from_attributes = True
+
+# --- Favorite Schemas ---
+class FavoriteBase(BaseModel):
+    user_id: int
+    book_id: int
+
+class FavoriteCreate(FavoriteBase):
+    pass
+
+class FavoriteResponse(FavoriteBase):
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

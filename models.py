@@ -159,3 +159,28 @@ class ReturnRequestDetail(Base):
     isbn = Column(String(50), nullable=False)
 
     request = relationship("ReturnRequest", back_populates="details")
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    comment_id = Column(Integer, primary_key=True, index=True)
+    book_id = Column(Integer, ForeignKey("books.book_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    rating = Column(Integer, default=5)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    book = relationship("Book")
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    book_id = Column(Integer, ForeignKey("books.book_id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    book = relationship("Book")

@@ -1640,3 +1640,64 @@ def get_related_books(book_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error fetching related books: {e}")
         return []
+
+# --- Comment Endpoints ---
+@app.post("/api/comments")
+def create_comment(comment: schemas.CommentCreate, db: Session = Depends(get_db)):
+    db_comment = models.Comment(**comment.dict())
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
+
+@app.get("/api/books/{book_id}/comments", response_model=List[schemas.CommentResponse])
+def get_book_comments(book_id: int, db: Session = Depends(get_db)):
+    comments = db.query(models.Comment).filter(models.Comment.book_id == book_id).order_by(models.Comment.created_at.desc()).all()
+    
+    # Enrich with user name
+    result = []
+    for c in comments:
+        user = db.query(models.User).filter(models.User.user_id == c.user_id).first()
+        result.append(schemas.CommentResponse(
+            comment_id=c.comment_id,
+            book_id=c.book_id,
+            user_id=c.user_id,
+            content=c.content,
+            rating=c.rating,
+            created_at=c.created_at,
+            user_name=user.full_name if user else "Unknown"
+        ))
+    return result
+
+# --- Favorite Endpoints ---
+@app.post("/api/favorites/toggle")
+def toggle_favorite(favorite: schemas.FavoriteBase, db: Session = Depends(get_db)):
+    existing = db.query(models.Favorite).filter(
+        models.Favorite.user_id == favorite.user_id,
+        models.Favorite.book_id == favorite.book_id
+    ).first()
+    
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"status": "removed"}
+    else:
+        db_fav = models.Favorite(**favorite.dict())
+        db.add(db_fav)
+        db.commit()
+        return {"status": "added"}
+
+@app.get("/api/users/{user_id}/favorites", response_model=List[schemas.BookResponse])
+def get_user_favorites(user_id: int, db: Session = Depends(get_db)):
+    favs = db.query(models.Favorite).filter(models.Favorite.user_id == user_id).all()
+    book_ids = [f.book_id for f in favs]
+    books = db.query(models.Book).filter(models.Book.book_id.in_(book_ids)).all()
+    return books
+
+@app.get("/api/users/{user_id}/favorites/{book_id}")
+def check_favorite(user_id: int, book_id: int, db: Session = Depends(get_db)):
+    fav = db.query(models.Favorite).filter(
+        models.Favorite.user_id == user_id,
+        models.Favorite.book_id == book_id
+    ).first()
+    return {"is_favorite": fav is not None}
