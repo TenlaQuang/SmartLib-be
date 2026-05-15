@@ -10,7 +10,7 @@ from typing import List, Optional, Union
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -155,6 +155,42 @@ def test_db(db: Session = Depends(get_db)):
         return {"status": "ok", "message": "Kết nối Database thành công!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# ==============================================================================
+# Database & Cloudinary config
+# ==============================================================================
+
+# WebSocket Manager for Real-time Notifications
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/admin-notifications")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 # ==============================================================================
@@ -1183,8 +1219,11 @@ def lock_user_nfc(user_id: int, background_tasks: BackgroundTasks, db: Session =
 # ==============================================================================
 # Borrow Requests
 # ==============================================================================
+async def notify_new_borrow_request():
+    await manager.broadcast({"type": "NEW_BORROW_REQUEST", "message": "Có người dùng vừa yêu cầu mượn sách!"})
+
 @app.post("/api/borrow-requests", response_model=schemas.BorrowRequestResponse)
-def create_borrow_request(request_in: schemas.BorrowRequestCreate, db: Session = Depends(get_db)):
+def create_borrow_request(request_in: schemas.BorrowRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Lưu yêu cầu mượn sách từ mobile app."""
     try:
         # Kiểm tra user có tồn tại không
@@ -1211,6 +1250,10 @@ def create_borrow_request(request_in: schemas.BorrowRequestCreate, db: Session =
         
         db.commit()
         db.refresh(db_request)
+        
+        # Gửi WebSocket notification cho Admin
+        background_tasks.add_task(notify_new_borrow_request)
+        
         return db_request
 
     except HTTPException as he:
@@ -1218,3 +1261,55 @@ def create_borrow_request(request_in: schemas.BorrowRequestCreate, db: Session =
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu yêu cầu mượn sách: {str(e)}")
+
+@app.get("/api/borrow-requests")
+def get_borrow_requests(db: Session = Depends(get_db)):
+    """Lấy danh sách tất cả yêu cầu mượn sách (Admin)"""
+    from sqlalchemy.orm import joinedload
+    requests = db.query(models.BorrowRequest).options(joinedload(models.BorrowRequest.details)).order_by(models.BorrowRequest.created_at.desc()).all()
+    
+    # Bổ sung thông tin User và Title sách vào response
+    result = []
+    for req in requests:
+        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
+        details = []
+        for det in req.details:
+            book = db.query(models.Book).filter(models.Book.isbn == det.isbn).first()
+            details.append({
+                "detail_id": det.detail_id,
+                "isbn": det.isbn,
+                "title": book.title if book else "Không rõ"
+            })
+        
+        result.append({
+            "request_id": req.request_id,
+            "user_id": req.user_id,
+            "user_name": user.full_name if user else "Khách",
+            "status": req.status,
+            "created_at": req.created_at,
+            "details": details
+        })
+    return result
+
+@app.put("/api/borrow-requests/{request_id}/status")
+def update_borrow_request_status(request_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Duyệt hoặc Từ chối yêu cầu mượn sách (Admin)"""
+    status = payload.get("status")
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ.")
+        
+    req = db.query(models.BorrowRequest).filter(models.BorrowRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu.")
+        
+    req.status = status
+    db.commit()
+    return {"message": "Cập nhật trạng thái thành công"}
+
+@app.get("/api/borrow-requests/{request_id}", response_model=schemas.BorrowRequestResponse)
+def get_borrow_request_status(request_id: int, db: Session = Depends(get_db)):
+    """Kiểm tra trạng thái của đơn mượn sách."""
+    req = db.query(models.BorrowRequest).filter(models.BorrowRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu mượn sách.")
+    return req
