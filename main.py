@@ -1519,7 +1519,7 @@ def update_recommendations(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_recommender_task)
     return {"message": "Đang chạy cập nhật hệ thống gợi ý sách ngầm..."}
 
-@app.get("/api/recommendations/user-centric/{user_id}")
+@app.get("/api/recommendations/user-centric/{user_id}", response_model=List[schemas.BookResponse])
 def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)):
     """
     Collaborative Filtering: Recommend books based on similar users' behaviors.
@@ -1588,7 +1588,7 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
     
     return ordered_books
 
-@app.get("/api/books/{book_id}/related")
+@app.get("/api/books/{book_id}/related", response_model=List[schemas.BookResponse])
 def get_related_books(book_id: int, db: Session = Depends(get_db)):
     """
     Trả về tối đa 5 sách liên quan, đảm bảo không trùng ISBN.
