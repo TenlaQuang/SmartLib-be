@@ -23,7 +23,6 @@ from database import get_db
 import models
 import schemas
 import email_utils
-import recommender
 
 # ==============================================================================
 # Cấu hình dịch vụ bên ngoài
@@ -1498,7 +1497,10 @@ def update_return_request_status(request_id: int, payload: dict, db: Session = D
 # ==============================================================================
 def run_recommender_task():
     try:
+        import recommender
         recommender.main()
+    except ImportError:
+        print("Bỏ qua gợi ý sách: Thư viện scikit-learn chưa được cài đặt.")
     except Exception as e:
         print(f"Lỗi khi cập nhật gợi ý sách: {e}")
 
