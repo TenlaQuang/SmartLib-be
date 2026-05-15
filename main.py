@@ -1322,7 +1322,7 @@ def update_borrow_request_status(request_id: int, payload: dict, db: Session = D
             # Tạo Transaction mới
             new_tx = models.Transaction(
                 user_id=req.user_id,
-                isbn=det.isbn,
+                book_id=available_book.book_id,
                 borrow_date=datetime.utcnow(),
                 due_date=datetime.utcnow() + timedelta(days=14), # Cho mượn mặc định 14 ngày
                 status="ongoing"
