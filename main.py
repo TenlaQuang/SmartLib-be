@@ -1578,14 +1578,17 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
 @app.get("/api/books/{book_id}/related")
 def get_related_books(book_id: int, db: Session = Depends(get_db)):
     """
-    Get related books based on Content-Based Filtering (from book_recommendations table)
-    with a fallback to Same-Category books.
+    Trả về tối đa 5 sách liên quan, đảm bảo không trùng ISBN.
+    Ưu tiên: ML recommendations (từ bảng book_recommendations) -> Fallback cùng thể loại.
     """
     try:
-        # Step 1: Try to get ML-based recommendations
+        current_book = db.query(models.Book).filter(models.Book.book_id == book_id).first()
+        current_isbn = current_book.isbn if current_book else None
+
+        # Step 1: Lấy gợi ý ML từ bảng book_recommendations
         query = text("SELECT recommended_ids FROM book_recommendations WHERE book_id = :bid LIMIT 1")
         result = db.execute(query, {"bid": book_id}).fetchone()
-        
+
         recommended_ids = []
         if result and result[0]:
             recommended_ids = result[0]
@@ -1597,27 +1600,43 @@ def get_related_books(book_id: int, db: Session = Depends(get_db)):
                     clean_str = recommended_ids.replace('{', '').replace('}', '')
                     if clean_str:
                         recommended_ids = [int(x.strip()) for x in clean_str.split(',')]
-        
-        # Step 2: If no ML recommendations, fallback to same category
-        if not recommended_ids:
-            # Get the category of the current book
-            current_book = db.query(models.Book).filter(models.Book.book_id == book_id).first()
-            if current_book:
-                fallback_books = db.query(models.Book).filter(
-                    models.Book.category_id == current_book.category_id,
-                    models.Book.book_id != book_id
-                ).limit(5).all()
-                return fallback_books
-            return []
 
-        # Step 3: Fetch full book objects for ML recommendations
-        books = db.query(models.Book).filter(models.Book.book_id.in_(recommended_ids)).all()
-        
-        # Sort books to match the recommendation ranking
-        book_map = {b.book_id: b for b in books}
-        ordered_books = [book_map[bid] for bid in recommended_ids if bid in book_map]
-        
-        return ordered_books
+        # Step 2: Nếu có ML recs -> lấy sách, dedup theo ISBN, max 5 tựa khác nhau
+        if recommended_ids:
+            books = db.query(models.Book).filter(models.Book.book_id.in_(recommended_ids)).all()
+            book_map = {b.book_id: b for b in books}
+            
+            seen_isbns = {current_isbn} if current_isbn else set()
+            ordered_books = []
+            for bid in recommended_ids:
+                book = book_map.get(bid)
+                if book and book.isbn not in seen_isbns:
+                    seen_isbns.add(book.isbn)
+                    ordered_books.append(book)
+                if len(ordered_books) >= 5:
+                    break
+            
+            if ordered_books:
+                return ordered_books
+
+        # Step 3: Fallback - sách cùng thể loại, dedup theo ISBN
+        if current_book:
+            fallback_books = db.query(models.Book).filter(
+                models.Book.category_id == current_book.category_id,
+                models.Book.book_id != book_id
+            ).all()
+
+            seen_isbns = {current_isbn} if current_isbn else set()
+            result_books = []
+            for b in fallback_books:
+                if b.isbn not in seen_isbns:
+                    seen_isbns.add(b.isbn)
+                    result_books.append(b)
+                if len(result_books) >= 5:
+                    break
+            return result_books
+
+        return []
     except Exception as e:
         print(f"Error fetching related books: {e}")
         return []
