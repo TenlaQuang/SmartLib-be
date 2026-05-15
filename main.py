@@ -1113,11 +1113,21 @@ def get_user_activity(user_id: int, db: Session = Depends(get_db)):
         else:
             completed.append(res)
             
+    # Lấy danh sách yêu thích
+    favs = db.query(models.Favorite).filter(models.Favorite.user_id == user_id).all()
+    book_ids = [f.book_id for f in favs]
+    favorite_books = db.query(models.Book).options(
+        joinedload(models.Book.category),
+        joinedload(models.Book.location)
+    ).filter(models.Book.book_id.in_(book_ids)).all()
+            
     return {
         "ongoing_count": len(ongoing),
         "ongoing_books": ongoing,
         "completed_count": len(completed),
-        "history": completed
+        "history": completed,
+        "favorite_count": len(favorite_books),
+        "favorites": favorite_books
     }
 
 @app.get("/api/locations", response_model=List[schemas.LocationWithCount])
@@ -1567,7 +1577,10 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
 
     # Fetch full book objects using the IDs found
     book_ids = [row[0] for row in result]
-    books = db.query(models.Book).filter(models.Book.book_id.in_(book_ids)).all()
+    books = db.query(models.Book).options(
+        joinedload(models.Book.category),
+        joinedload(models.Book.location)
+    ).filter(models.Book.book_id.in_(book_ids)).all()
     
     # Sort books to match the recommendation ranking
     book_map = {b.book_id: b for b in books}
@@ -1603,7 +1616,10 @@ def get_related_books(book_id: int, db: Session = Depends(get_db)):
 
         # Step 2: Nếu có ML recs -> lấy sách, dedup theo ISBN, max 5 tựa khác nhau
         if recommended_ids:
-            books = db.query(models.Book).filter(models.Book.book_id.in_(recommended_ids)).all()
+            books = db.query(models.Book).options(
+                joinedload(models.Book.category),
+                joinedload(models.Book.location)
+            ).filter(models.Book.book_id.in_(recommended_ids)).all()
             book_map = {b.book_id: b for b in books}
             
             seen_isbns = {current_isbn} if current_isbn else set()
@@ -1621,7 +1637,10 @@ def get_related_books(book_id: int, db: Session = Depends(get_db)):
 
         # Step 3: Fallback - sách cùng thể loại, dedup theo ISBN
         if current_book:
-            fallback_books = db.query(models.Book).filter(
+            fallback_books = db.query(models.Book).options(
+                joinedload(models.Book.category),
+                joinedload(models.Book.location)
+            ).filter(
                 models.Book.category_id == current_book.category_id,
                 models.Book.book_id != book_id
             ).all()

@@ -195,6 +195,8 @@ class UserActivityResponse(BaseModel):
     ongoing_books: List[TransactionResponse]
     completed_count: int
     history: List[TransactionResponse]
+    favorite_count: int = 0
+    favorites: List[BookResponse] = []
 
 # --- Borrow Request Schemas ---
 class BorrowRequestCreate(BaseModel):
