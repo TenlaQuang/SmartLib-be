@@ -1231,6 +1231,16 @@ def create_borrow_request(request_in: schemas.BorrowRequestCreate, background_ta
         if not user:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
 
+        # Kiểm tra trước xem các sách được yêu cầu còn cuốn nào rảnh không
+        for isbn in request_in.isbns:
+            available_count = db.query(models.Book).filter(
+                models.Book.isbn == isbn,
+                models.Book.status == "available"
+            ).count()
+            
+            if available_count == 0:
+                raise HTTPException(status_code=400, detail=f"Sách có mã {isbn} hiện tại đã được mượn hết, vui lòng chọn cuốn khác.")
+
         # Tạo request
         db_request = models.BorrowRequest(
             user_id=request_in.user_id,
