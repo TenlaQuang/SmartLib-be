@@ -17,12 +17,14 @@ def send_html_email(to_email: str, subject: str, html_content: str, text_content
     }
 
     try:
-        # Gửi request POST đến Google Script
-        response = requests.post(script_url, data=json.dumps(payload))
+        response = requests.post(script_url, data=json.dumps(payload), headers={'Content-Type': 'application/json'})
         if response.text == "Success":
             print(f"Đã gửi mail thành công qua Google Script tới: {to_email}")
         else:
-            print(f"Phản hồi từ Google Script: {response.text}")
+            if "<html" in response.text.lower():
+                print(f"Lỗi: Google Script đã bị khóa (hoặc sai URL). Vui lòng tạo Link Script mới!")
+            else:
+                print(f"Phản hồi từ Google Script: {response.text}")
     except Exception as e:
         print(f"Lỗi kết nối Google Script: {e}")
 

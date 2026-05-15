@@ -903,10 +903,8 @@ def check_user_for_nfc(user_code: str, db: Session = Depends(get_db)):
 
 @app.get("/api/registration-requests", response_model=List[schemas.RegistrationRequestResponse])
 def get_registration_requests(db: Session = Depends(get_db)):
-    """Lấy danh sách đơn đăng ký chờ duyệt."""
-    return db.query(models.RegistrationRequest).filter(
-        models.RegistrationRequest.request_status == 'pending'
-    ).all()
+    """Lấy danh sách tất cả đơn đăng ký (pending, approved, rejected)."""
+    return db.query(models.RegistrationRequest).order_by(models.RegistrationRequest.created_at.desc()).all()
 
 @app.post("/api/registration-requests/{request_id}/approve")
 def approve_registration_request(request_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
