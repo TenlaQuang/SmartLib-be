@@ -1496,6 +1496,21 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
     
     result = db.execute(cf_query, {"uid": user_id}).fetchall()
     
+    # Fallback logic if Collaborative Filtering yields no results (Cold Start)
+    if not result:
+        fallback_query = text("""
+            SELECT b.book_id, b.title, b.author, b.image_url
+            FROM books b
+            JOIN transactions t ON b.book_id = t.book_id
+            WHERE b.book_id NOT IN (
+                SELECT book_id FROM transactions WHERE user_id = :uid
+            )
+            GROUP BY b.book_id, b.title, b.author, b.image_url
+            ORDER BY COUNT(t.transaction_id) DESC
+            LIMIT 5;
+        """)
+        result = db.execute(fallback_query, {"uid": user_id}).fetchall()
+    
     # Map to list of dicts to return as JSON
     return [
         {
