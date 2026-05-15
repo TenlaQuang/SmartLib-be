@@ -348,8 +348,18 @@ def get_featured_weekly(db: Session = Depends(get_db)):
     ).limit(10).all()
     
     if not top_borrows:
-        return []
-    
+        # Fallback: Tự động chuyển sang sách mượn nhiều nhất mọi thời đại nếu tuần này không có
+        top_borrows = db.query(
+            models.Transaction.book_id,
+            func.count(models.Transaction.transaction_id).label('borrow_count')
+        ).group_by(
+            models.Transaction.book_id
+        ).order_by(
+            text('borrow_count DESC')
+        ).limit(10).all()
+        
+        if not top_borrows:
+            return []    
     book_ids = [t.book_id for t in top_borrows]
     books = db.query(models.Book).options(
         joinedload(models.Book.category),
