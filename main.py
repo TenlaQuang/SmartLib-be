@@ -1302,6 +1302,58 @@ def update_borrow_request_status(request_id: int, payload: dict, db: Session = D
     if not req:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu.")
         
+    if status == "approved" and req.status != "approved":
+        from datetime import datetime, timedelta
+        
+        # 1. Gán sách & Tạo giao dịch (Transaction)
+        for det in req.details:
+            # Tìm 1 bản copy của tựa sách đang rảnh
+            available_book = db.query(models.Book).filter(
+                models.Book.isbn == det.isbn, 
+                models.Book.status == "available"
+            ).first()
+            
+            if not available_book:
+                raise HTTPException(status_code=400, detail=f"Không còn cuốn nào rảnh cho mã ISBN {det.isbn}")
+                
+            # Cập nhật trạng thái sách thành đang mượn
+            available_book.status = "borrowed"
+            
+            # Tạo Transaction mới
+            new_tx = models.Transaction(
+                user_id=req.user_id,
+                isbn=det.isbn,
+                borrow_date=datetime.utcnow(),
+                due_date=datetime.utcnow() + timedelta(days=14), # Cho mượn mặc định 14 ngày
+                status="ongoing"
+            )
+            db.add(new_tx)
+
+        # Lấy thông tin user để gửi mail
+        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
+        if user and user.email:
+            try:
+                email_utils.send_html_email(
+                    to_email=user.email,
+                    subject="SmartLib - Yêu cầu mượn sách đã được duyệt!",
+                    html_content=f"<h3>Chào {user.full_name},</h3><p>Yêu cầu mượn {len(req.details)} cuốn sách của bạn đã được Thủ thư phê duyệt.</p><p>Sách đã được thêm vào mục Đang mượn của bạn. Vui lòng đến thư viện nhận sách trong thời gian sớm nhất.</p>"
+                )
+            except Exception:
+                pass
+                
+    elif status == "rejected" and req.status != "rejected":
+        # Lấy thông tin user để gửi mail
+        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
+        if user and user.email:
+            try:
+                email_utils.send_html_email(
+                    to_email=user.email,
+                    subject="SmartLib - Yêu cầu mượn sách bị từ chối",
+                    html_content=f"<h3>Chào {user.full_name},</h3><p>Rất tiếc, yêu cầu mượn sách của bạn không được phê duyệt. Nguyên nhân có thể do sách đã được mượn hết hoặc tài khoản của bạn đang có vấn đề.</p>"
+                )
+            except Exception:
+                pass
+
     req.status = status
     db.commit()
     return {"message": "Cập nhật trạng thái thành công"}
