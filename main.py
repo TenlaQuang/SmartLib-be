@@ -1417,6 +1417,30 @@ def create_return_request(request_in: schemas.ReturnRequestCreate, background_ta
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu yêu cầu trả sách: {str(e)}")
 
+@app.get("/api/return-requests")
+def get_return_requests(db: Session = Depends(get_db)):
+    """Lấy danh sách tất cả các yêu cầu trả sách (dành cho Web Admin)"""
+    requests = db.query(models.ReturnRequest).order_by(models.ReturnRequest.created_at.desc()).all()
+    result = []
+    for req in requests:
+        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
+        details = [{"detail_id": d.detail_id, "isbn": d.isbn} for d in req.details]
+        
+        # Bổ sung tựa sách (title) vào details
+        for det in details:
+            book_info = db.query(models.Book).filter(models.Book.isbn == det["isbn"]).first()
+            det["title"] = book_info.title if book_info else "Sách không xác định"
+
+        result.append({
+            "request_id": req.request_id,
+            "user_id": req.user_id,
+            "user_name": user.full_name if user else "Khách",
+            "status": req.status,
+            "created_at": req.created_at,
+            "details": details
+        })
+    return result
+
 @app.get("/api/return-requests/{request_id}", response_model=schemas.ReturnRequestResponse)
 def get_return_request_status(request_id: int, db: Session = Depends(get_db)):
     """Kiểm tra trạng thái của đơn trả sách."""
