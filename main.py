@@ -1574,3 +1574,47 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
     ordered_books = [book_map[bid] for bid in book_ids if bid in book_map]
     
     return ordered_books
+
+@app.get("/api/books/{book_id}/related")
+def get_related_books(book_id: int, db: Session = Depends(get_db)):
+    """
+    Get related books based on Content-Based Filtering (from book_recommendations table)
+    """
+    try:
+        # Check if book_recommendations table exists and has data for this book
+        query = text("SELECT recommended_ids FROM book_recommendations WHERE book_id = :bid LIMIT 1")
+        result = db.execute(query, {"bid": book_id}).fetchone()
+        
+        if not result or not result[0]:
+            return []
+            
+        recommended_ids = result[0]
+        # recommended_ids is an array of ints, e.g., [1, 2, 3]
+        if isinstance(recommended_ids, str):
+            # If it's stored as a string like "{1,2,3}" or "[1,2,3]", we need to parse it
+            import json
+            try:
+                # Try JSON array first
+                recommended_ids = json.loads(recommended_ids)
+            except:
+                # Try Postgres array format {1,2,3}
+                clean_str = recommended_ids.replace('{', '').replace('}', '')
+                if clean_str:
+                    recommended_ids = [int(x.strip()) for x in clean_str.split(',')]
+                else:
+                    recommended_ids = []
+        
+        if not recommended_ids:
+            return []
+            
+        # Fetch the actual book objects
+        books = db.query(models.Book).filter(models.Book.book_id.in_(recommended_ids)).all()
+        
+        # Sort books to match the recommendation ranking
+        book_map = {b.book_id: b for b in books}
+        ordered_books = [book_map[bid] for bid in recommended_ids if bid in book_map]
+        
+        return ordered_books
+    except Exception as e:
+        print(f"Error fetching related books: {e}")
+        return []
