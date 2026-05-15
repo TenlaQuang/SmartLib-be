@@ -1483,7 +1483,7 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
         
     # Steps 2-5: Optimized User-to-User CF query using raw SQL
     cf_query = text("""
-        SELECT b.book_id, b.title, b.author, b.image_url
+        SELECT b.book_id
         FROM transactions t
         JOIN books b ON t.book_id = b.book_id
         WHERE t.user_id IN (
@@ -1498,10 +1498,10 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
             SELECT book_id FROM transactions WHERE user_id = :uid
         )
         -- Step 4: Ranking (Count frequency of these books among similar users)
-        GROUP BY b.book_id, b.title, b.author, b.image_url
+        GROUP BY b.book_id
         ORDER BY COUNT(DISTINCT t.user_id) DESC
         -- Step 5: Final Result limit
-        LIMIT 5;
+        LIMIT 10;
     """)
     
     result = db.execute(cf_query, {"uid": user_id}).fetchall()
@@ -1509,25 +1509,27 @@ def get_user_centric_recommendations(user_id: int, db: Session = Depends(get_db)
     # Fallback logic if Collaborative Filtering yields no results (Cold Start)
     if not result:
         fallback_query = text("""
-            SELECT b.book_id, b.title, b.author, b.image_url
+            SELECT b.book_id
             FROM books b
             JOIN transactions t ON b.book_id = t.book_id
             WHERE b.book_id NOT IN (
                 SELECT book_id FROM transactions WHERE user_id = :uid
             )
-            GROUP BY b.book_id, b.title, b.author, b.image_url
+            GROUP BY b.book_id
             ORDER BY COUNT(t.transaction_id) DESC
-            LIMIT 5;
+            LIMIT 10;
         """)
         result = db.execute(fallback_query, {"uid": user_id}).fetchall()
     
-    # Map to list of dicts to return as JSON
-    return [
-        {
-            "book_id": row[0],
-            "title": row[1],
-            "author": row[2],
-            "image_url": row[3]
-        }
-        for row in result
-    ]
+    if not result:
+        return []
+
+    # Fetch full book objects using the IDs found
+    book_ids = [row[0] for row in result]
+    books = db.query(models.Book).filter(models.Book.book_id.in_(book_ids)).all()
+    
+    # Sort books to match the recommendation ranking
+    book_map = {b.book_id: b for b in books}
+    ordered_books = [book_map[bid] for bid in book_ids if bid in book_map]
+    
+    return ordered_books
