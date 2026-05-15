@@ -1329,30 +1329,10 @@ def update_borrow_request_status(request_id: int, payload: dict, db: Session = D
             )
             db.add(new_tx)
 
-        # Lấy thông tin user để gửi mail
-        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
-        if user and user.email:
-            try:
-                email_utils.send_html_email(
-                    to_email=user.email,
-                    subject="SmartLib - Yêu cầu mượn sách đã được duyệt!",
-                    html_content=f"<h3>Chào {user.full_name},</h3><p>Yêu cầu mượn {len(req.details)} cuốn sách của bạn đã được Thủ thư phê duyệt.</p><p>Sách đã được thêm vào mục Đang mượn của bạn. Vui lòng đến thư viện nhận sách trong thời gian sớm nhất.</p>"
-                )
-            except Exception:
-                pass
+        # Không cần gửi mail theo yêu cầu
                 
     elif status == "rejected" and req.status != "rejected":
-        # Lấy thông tin user để gửi mail
-        user = db.query(models.User).filter(models.User.user_id == req.user_id).first()
-        if user and user.email:
-            try:
-                email_utils.send_html_email(
-                    to_email=user.email,
-                    subject="SmartLib - Yêu cầu mượn sách bị từ chối",
-                    html_content=f"<h3>Chào {user.full_name},</h3><p>Rất tiếc, yêu cầu mượn sách của bạn không được phê duyệt. Nguyên nhân có thể do sách đã được mượn hết hoặc tài khoản của bạn đang có vấn đề.</p>"
-                )
-            except Exception:
-                pass
+        pass # App sẽ tự nhận tín hiệu rejected qua API
 
     req.status = status
     db.commit()
