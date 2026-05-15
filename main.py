@@ -1355,3 +1355,102 @@ def get_borrow_request_status(request_id: int, db: Session = Depends(get_db)):
     if not req:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu mượn sách.")
     return req
+
+# ==============================================================================
+# Return Requests
+# ==============================================================================
+async def notify_new_return_request():
+    await manager.broadcast({"type": "NEW_RETURN_REQUEST", "message": "Có người dùng vừa yêu cầu trả sách!"})
+
+@app.post("/api/return-requests", response_model=schemas.ReturnRequestResponse)
+def create_return_request(request_in: schemas.ReturnRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Lưu yêu cầu trả sách từ mobile app."""
+    try:
+        user = db.query(models.User).filter(models.User.user_id == request_in.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+
+        # Kiểm tra người dùng có đang mượn những cuốn này không
+        for isbn in request_in.isbns:
+            # Join Book to check ISBN because Transaction uses book_id
+            ongoing_tx = db.query(models.Transaction).join(models.Book).filter(
+                models.Transaction.user_id == request_in.user_id,
+                models.Book.isbn == isbn,
+                models.Transaction.status == "ongoing"
+            ).first()
+            if not ongoing_tx:
+                raise HTTPException(status_code=400, detail=f"Bạn không đang mượn cuốn sách có mã {isbn}.")
+
+        db_request = models.ReturnRequest(
+            user_id=request_in.user_id,
+            status="pending"
+        )
+        db.add(db_request)
+        db.flush()
+
+        for isbn in request_in.isbns:
+            detail = models.ReturnRequestDetail(
+                request_id=db_request.request_id,
+                isbn=isbn
+            )
+            db.add(detail)
+        
+        db.commit()
+        db.refresh(db_request)
+        
+        background_tasks.add_task(notify_new_return_request)
+        return db_request
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu yêu cầu trả sách: {str(e)}")
+
+@app.get("/api/return-requests/{request_id}", response_model=schemas.ReturnRequestResponse)
+def get_return_request_status(request_id: int, db: Session = Depends(get_db)):
+    """Kiểm tra trạng thái của đơn trả sách."""
+    req = db.query(models.ReturnRequest).filter(models.ReturnRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu trả sách.")
+    return req
+
+@app.put("/api/return-requests/{request_id}/status")
+def update_return_request_status(request_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Duyệt hoặc Từ chối yêu cầu trả sách (Admin)"""
+    status = payload.get("status")
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ.")
+        
+    req = db.query(models.ReturnRequest).filter(models.ReturnRequest.request_id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu.")
+        
+    if status == "approved" and req.status != "approved":
+        # Process return logic
+        for det in req.details:
+            # Find the ongoing transaction
+            ongoing_tx = db.query(models.Transaction).join(models.Book).filter(
+                models.Transaction.user_id == req.user_id,
+                models.Book.isbn == det.isbn,
+                models.Transaction.status == "ongoing"
+            ).first()
+            
+            if ongoing_tx:
+                # Use raw SQL to call the existing procedure, or do it via ORM
+                # The user's procedure: CALL process_return(ongoing_tx.transaction_id)
+                # But since it's a stored procedure, we can call it using SQLAlchemy text
+                try:
+                    db.execute(text("CALL process_return(:tx_id)"), {"tx_id": ongoing_tx.transaction_id})
+                except Exception as e:
+                    # Fallback logic if procedure fails or doesn't exist
+                    ongoing_tx.status = "completed"
+                    ongoing_tx.return_date = datetime.utcnow()
+                    # Free the book
+                    book = db.query(models.Book).filter(models.Book.book_id == ongoing_tx.book_id).first()
+                    if book:
+                        book.status = "available"
+
+    req.status = status
+    db.commit()
+    return {"message": "Cập nhật trạng thái thành công"}

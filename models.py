@@ -140,3 +140,22 @@ class BorrowRequestDetail(Base):
     isbn = Column(String(50), nullable=False)
 
     request = relationship("BorrowRequest", back_populates="details")
+
+class ReturnRequest(Base):
+    __tablename__ = "return_requests"
+
+    request_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    status = Column(String(20), default="pending") # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    details = relationship("ReturnRequestDetail", back_populates="request", cascade="all, delete-orphan")
+
+class ReturnRequestDetail(Base):
+    __tablename__ = "return_request_details"
+
+    detail_id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("return_requests.request_id", ondelete="CASCADE"), nullable=False)
+    isbn = Column(String(50), nullable=False)
+
+    request = relationship("ReturnRequest", back_populates="details")
