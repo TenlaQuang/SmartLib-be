@@ -913,6 +913,37 @@ def update_user(user_id: int, payload: schemas.UserUpdate, db: Session = Depends
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/api/users/{user_id}/update-secure")
+def update_user_secure(user_id: int, payload: schemas.UserUpdateSecure, db: Session = Depends(get_db)):
+    """Cập nhật email và số điện thoại an toàn có xác thực thẻ NFC."""
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+        
+    # Xác thực thẻ NFC
+    if not user.nfc_tag_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Tài khoản này chưa được gán bất kỳ thẻ NFC nào! Vui lòng liên hệ thủ thư để nhận thẻ trước khi đổi thông tin."
+        )
+        
+    if user.nfc_tag_id != payload.nfc_serial:
+        raise HTTPException(
+            status_code=403, 
+            detail="Xác thực NFC thất bại! Thẻ được quét không khớp với thẻ đã đăng ký của tài khoản này."
+        )
+        
+    user.email = payload.email
+    user.phone_number = payload.phone_number
+    
+    try:
+        db.commit()
+        db.refresh(user)
+        return {"message": "Cập nhật thông tin thành công!", "user_id": user.user_id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     """Xóa người dùng (Lưu ý: Chỉ nên xóa nếu không có ràng buộc mượn trả)."""

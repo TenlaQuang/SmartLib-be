@@ -273,3 +273,9 @@ class FavoriteResponse(FavoriteBase):
     
     class Config:
         from_attributes = True
+
+# --- Secure Update Schema ---
+class UserUpdateSecure(BaseModel):
+    email: str
+    phone_number: str
+    nfc_serial: str
