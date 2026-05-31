@@ -175,10 +175,13 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
+        print(f"Broadcasting message to {len(self.active_connections)} connections: {message}")
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception:
+                print("Broadcast successful to a connection")
+            except Exception as e:
+                print(f"Broadcast failed: {e}")
                 pass
 
 manager = ConnectionManager()
@@ -1287,7 +1290,7 @@ async def notify_new_borrow_request():
     await manager.broadcast({"type": "NEW_BORROW_REQUEST", "message": "Có người dùng vừa yêu cầu mượn sách!"})
 
 @app.post("/api/borrow-requests", response_model=schemas.BorrowRequestResponse)
-def create_borrow_request(request_in: schemas.BorrowRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def create_borrow_request(request_in: schemas.BorrowRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Lưu yêu cầu mượn sách từ mobile app."""
     try:
         # Kiểm tra user có tồn tại không
@@ -1427,7 +1430,7 @@ async def notify_new_return_request():
     await manager.broadcast({"type": "NEW_RETURN_REQUEST", "message": "Có người dùng vừa yêu cầu trả sách!"})
 
 @app.post("/api/return-requests", response_model=schemas.ReturnRequestResponse)
-def create_return_request(request_in: schemas.ReturnRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def create_return_request(request_in: schemas.ReturnRequestCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Lưu yêu cầu trả sách từ mobile app."""
     try:
         user = db.query(models.User).filter(models.User.user_id == request_in.user_id).first()
