@@ -309,7 +309,8 @@ def get_books(
         query = query.filter(
             (models.Book.title.ilike(search_filter)) | 
             (models.Book.author.ilike(search_filter)) |
-            (models.Book.isbn.ilike(search_filter))
+            (models.Book.isbn.ilike(search_filter)) |
+            (models.Book.description.ilike(search_filter))
         )
         
     if category_id:
@@ -383,7 +384,8 @@ def get_book_title_groups(q: Optional[str] = None, category_id: Optional[int] = 
         query = query.filter(
             (models.Book.title.ilike(search_filter)) | 
             (models.Book.author.ilike(search_filter)) |
-            (models.Book.isbn.ilike(search_filter))
+            (models.Book.isbn.ilike(search_filter)) |
+            (models.Book.description.ilike(search_filter))
         )
     
     if category_id:
