@@ -1243,7 +1243,10 @@ def login_nfc(payload: schemas.AssignNFC, db: Session = Depends(get_db)):
         "user": {
             "user_id": user.user_id,
             "full_name": user.full_name,
-            "user_code": user.user_code
+            "user_code": user.user_code,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "nfc_tag_id": user.nfc_tag_id
         }
     }
 
