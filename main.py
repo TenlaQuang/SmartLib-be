@@ -765,6 +765,8 @@ def create_payment_link(payload: schemas.PayosLinkCreate):
         print(f"PayOS Error: {str(payos_err)}")
         raise HTTPException(status_code=400, detail=f"Lỗi kết nối PayOS: {str(payos_err)}. Hãy kiểm tra Client ID/API Key trên Render!")
 
+async def notify_new_registration():
+    await manager.broadcast({"type": "NEW_REGISTRATION_REQUEST", "message": "Có người dùng vừa gửi yêu cầu đăng ký thẻ!"})
 
 @app.post("/api/register")
 async def register_user(
@@ -808,6 +810,9 @@ async def register_user(
         if email:
             html = email_utils.get_new_request_template(full_name, user_code)
             background_tasks.add_task(email_utils.send_html_email, email, "SmartLib - Đã nhận đơn đăng ký", html)
+
+        # Broadcast WebSocket
+        background_tasks.add_task(notify_new_registration)
 
         # Trả về kết quả
         return {"message": "Đăng ký thành công, vui lòng chờ thủ thư duyệt đơn."}
