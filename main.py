@@ -1764,3 +1764,61 @@ def check_favorite(user_id: int, book_id: int, db: Session = Depends(get_db)):
         models.Favorite.book_id == book_id
     ).first()
     return {"is_favorite": fav is not None}
+
+# ==============================================================================
+# Notify Due Books
+# ==============================================================================
+@app.post("/api/admin/notify-due-books")
+def notify_due_books(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Gửi email nhắc nhở cho những sách sắp đến hạn trả hoặc đã quá hạn."""
+    import datetime
+    
+    # Lấy các giao dịch đang mượn
+    borrowed_txs = db.query(models.Transaction).filter(models.Transaction.status == "borrowed").all()
+    today = datetime.date.today()
+    
+    notified_count = 0
+    for tx in borrowed_txs:
+        # Nếu return_date trống thì bỏ qua
+        if not tx.return_date:
+            continue
+            
+        try:
+            # Chuyển đổi return_date (có thể là str "YYYY-MM-DD" hoặc datetime)
+            if isinstance(tx.return_date, str):
+                # Tùy thuộc vào định dạng lưu trong DB, thông thường là YYYY-MM-DD
+                return_date_str = tx.return_date.split("T")[0] if "T" in tx.return_date else tx.return_date
+                return_date = datetime.datetime.strptime(return_date_str, "%Y-%m-%d").date()
+            elif isinstance(tx.return_date, datetime.datetime):
+                return_date = tx.return_date.date()
+            else:
+                return_date = tx.return_date
+                
+            # Kiểm tra nếu hạn trả sách trong vòng 3 ngày tới hoặc đã quá hạn
+            days_left = (return_date - today).days
+            if days_left <= 3:
+                user = db.query(models.User).filter(models.User.user_id == tx.user_id).first()
+                book = db.query(models.Book).filter(models.Book.book_id == tx.book_id).first()
+                
+                if user and user.email and book:
+                    # Tính phí trễ hạn = 10% giá trị sách
+                    penalty_fee = float(book.market_price or 0.0) * 0.10
+                    
+                    html_content = email_utils.get_due_reminder_template(
+                        full_name=user.full_name,
+                        book_title=book.title,
+                        due_date=return_date.strftime("%d/%m/%Y"),
+                        penalty_fee=penalty_fee
+                    )
+                    
+                    background_tasks.add_task(
+                        email_utils.send_html_email, 
+                        user.email, 
+                        "SmartLib - Cảnh báo: Sắp đến hạn trả sách!", 
+                        html_content
+                    )
+                    notified_count += 1
+        except Exception as e:
+            print(f"Lỗi khi xử lý thông báo cho transaction {tx.transaction_id}: {e}")
+            
+    return {"message": f"Đã gửi {notified_count} email nhắc nhở thành công."}

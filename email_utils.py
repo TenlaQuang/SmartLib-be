@@ -159,3 +159,29 @@ def get_lock_nfc_template(full_name: str):
     </body>
     </html>
     """
+
+def get_due_reminder_template(full_name: str, book_title: str, due_date: str, penalty_fee: float):
+    """Template HTML nhắc nhở sắp đến hạn trả sách."""
+    # Định dạng số tiền
+    formatted_fee = f"{int(penalty_fee):,} VND".replace(",", ".") if penalty_fee > 0 else "0 VND"
+    
+    return f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #f57c00; text-align: center;">Cảnh báo: Sắp đến hạn trả sách!</h2>
+            <p>Chào <strong>{full_name}</strong>,</p>
+            <p>Thư viện SmartLib xin thông báo cuốn sách bạn đang mượn sắp đến hạn trả. Vui lòng mang sách đến trả đúng hạn để tránh bị phạt.</p>
+            <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; color: #e65100; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>Thông tin mượn sách:</strong><br>
+                Tên sách: <strong>{book_title}</strong><br>
+                Ngày hạn trả: <span style="font-weight: bold; color: #d32f2f;">{due_date}</span>
+            </div>
+            <p style="color: #d32f2f; font-weight: bold;">⚠️ Nếu bạn không trả sách đúng hạn, phí trễ hạn (10% giá trị sách) sẽ được áp dụng: {formatted_fee}</p>
+            <p>Xin cảm ơn bạn đã sử dụng dịch vụ của SmartLib.</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="font-size: 12px; color: #888; text-align: center;">SmartLib System</p>
+        </div>
+    </body>
+    </html>
+    """
