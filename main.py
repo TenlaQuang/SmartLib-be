@@ -1528,19 +1528,19 @@ def update_return_request_status(request_id: int, payload: dict, db: Session = D
             ).first()
             
             if ongoing_tx:
-                # Use raw SQL to call the existing procedure, or do it via ORM
-                # The user's procedure: CALL process_return(ongoing_tx.transaction_id)
-                # But since it's a stored procedure, we can call it using SQLAlchemy text
-                try:
-                    db.execute(text("CALL process_return(:tx_id)"), {"tx_id": ongoing_tx.transaction_id})
-                except Exception as e:
-                    # Fallback logic if procedure fails or doesn't exist
-                    ongoing_tx.status = "completed"
-                    ongoing_tx.return_date = datetime.utcnow()
-                    # Free the book
-                    book = db.query(models.Book).filter(models.Book.book_id == ongoing_tx.book_id).first()
-                    if book:
-                        book.status = "available"
+                # Xử lý trả sách và tính phí trễ hạn (10% giá trị sách nếu quá hạn)
+                ongoing_tx.status = "completed"
+                ongoing_tx.return_date = datetime.utcnow()
+                
+                book = db.query(models.Book).filter(models.Book.book_id == ongoing_tx.book_id).first()
+                if book:
+                    book.status = "available"
+                    # Kiểm tra quá hạn
+                    if ongoing_tx.return_date > ongoing_tx.due_date:
+                        penalty_fee = float(book.market_price or 0.0) * 0.10
+                        ongoing_tx.total_fee = penalty_fee
+                    else:
+                        ongoing_tx.total_fee = 0
 
     req.status = status
     db.commit()
@@ -1774,28 +1774,27 @@ def notify_due_books(background_tasks: BackgroundTasks, db: Session = Depends(ge
     import datetime
     
     # Lấy các giao dịch đang mượn
-    borrowed_txs = db.query(models.Transaction).filter(models.Transaction.status == "borrowed").all()
+    borrowed_txs = db.query(models.Transaction).filter(models.Transaction.status == "ongoing").all()
     today = datetime.date.today()
     
     notified_count = 0
     for tx in borrowed_txs:
-        # Nếu return_date trống thì bỏ qua
-        if not tx.return_date:
+        # Nếu due_date trống thì bỏ qua
+        if not tx.due_date:
             continue
             
         try:
-            # Chuyển đổi return_date (có thể là str "YYYY-MM-DD" hoặc datetime)
-            if isinstance(tx.return_date, str):
-                # Tùy thuộc vào định dạng lưu trong DB, thông thường là YYYY-MM-DD
-                return_date_str = tx.return_date.split("T")[0] if "T" in tx.return_date else tx.return_date
-                return_date = datetime.datetime.strptime(return_date_str, "%Y-%m-%d").date()
-            elif isinstance(tx.return_date, datetime.datetime):
-                return_date = tx.return_date.date()
+            # Chuyển đổi due_date (có thể là str "YYYY-MM-DD" hoặc datetime)
+            if isinstance(tx.due_date, str):
+                due_date_str = tx.due_date.split("T")[0] if "T" in tx.due_date else tx.due_date
+                due_date = datetime.datetime.strptime(due_date_str, "%Y-%m-%d").date()
+            elif isinstance(tx.due_date, datetime.datetime):
+                due_date = tx.due_date.date()
             else:
-                return_date = tx.return_date
+                due_date = tx.due_date
                 
             # Kiểm tra nếu hạn trả sách trong vòng 3 ngày tới hoặc đã quá hạn
-            days_left = (return_date - today).days
+            days_left = (due_date - today).days
             if days_left <= 3:
                 user = db.query(models.User).filter(models.User.user_id == tx.user_id).first()
                 book = db.query(models.Book).filter(models.Book.book_id == tx.book_id).first()
