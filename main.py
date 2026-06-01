@@ -195,6 +195,48 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+@app.get("/api/admin/pending-notifications")
+def get_admin_pending_notifications(db: Session = Depends(get_db)):
+    """Lấy danh sách các đơn đang chờ duyệt để làm thông báo cho web admin"""
+    notifications = []
+    
+    # 1. Mượn sách
+    borrow_reqs = db.query(models.BorrowRequest).filter(models.BorrowRequest.status == "pending").all()
+    for req in borrow_reqs:
+        notifications.append({
+            "id": f"borrow_{req.request_id}",
+            "message": f"Có yêu cầu mượn sách mới từ User ID {req.user_id}",
+            "type": "NEW_BORROW_REQUEST",
+            "read": False,
+            "time": req.created_at.isoformat() if req.created_at else None
+        })
+        
+    # 2. Trả sách
+    return_reqs = db.query(models.ReturnRequest).filter(models.ReturnRequest.status == "pending").all()
+    for req in return_reqs:
+        notifications.append({
+            "id": f"return_{req.request_id}",
+            "message": f"Có yêu cầu trả sách mới từ User ID {req.user_id}",
+            "type": "NEW_RETURN_REQUEST",
+            "read": False,
+            "time": req.created_at.isoformat() if req.created_at else None
+        })
+        
+    # 3. Đăng ký
+    reg_reqs = db.query(models.RegistrationRequest).filter(models.RegistrationRequest.request_status == "pending").all()
+    for req in reg_reqs:
+        notifications.append({
+            "id": f"reg_{req.request_id}",
+            "message": f"Yêu cầu đăng ký mới từ {req.full_name}",
+            "type": "NEW_REGISTRATION_REQUEST",
+            "read": False,
+            "time": datetime.utcnow().isoformat() # RegistrationRequest hiện chưa có created_at nên dùng hnay
+        })
+        
+    # Sắp xếp mới nhất lên đầu
+    notifications.sort(key=lambda x: x["time"] if x["time"] else "", reverse=True)
+    return notifications
+
 
 # ==============================================================================
 # Dashboard Analytics
