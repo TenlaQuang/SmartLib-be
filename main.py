@@ -1029,6 +1029,20 @@ def approve_registration_request(request_id: int, background_tasks: BackgroundTa
         )
         db.add(new_user)
         db.commit()
+        db.refresh(new_user)
+
+        # Thêm thông báo chào mừng
+        try:
+            welcome_notif = models.Notification(
+                user_id=new_user.user_id,
+                title="Chào mừng đến với SmartLib! 🎉",
+                content=f"Chào mừng bạn {new_user.full_name} đến với ứng dụng SmartLib! Chúc bạn có những trải nghiệm đọc sách tuyệt vời.",
+                type="welcome"
+            )
+            db.add(welcome_notif)
+            db.commit()
+        except Exception as e:
+            print(f"Lỗi khi tạo thông báo chào mừng: {e}")
 
         if req.email:
             html = email_utils.get_approval_template(req.full_name, has_nfc)
@@ -1405,6 +1419,18 @@ def update_borrow_request_status(request_id: int, payload: dict, db: Session = D
                 status="ongoing"
             )
             db.add(new_tx)
+            
+            # Thêm thông báo mượn sách thành công
+            try:
+                borrow_notif = models.Notification(
+                    user_id=req.user_id,
+                    title="Mượn sách thành công 📚",
+                    content=f"Bạn đã mượn thành công cuốn sách '{available_book.title}'. Hạn trả là {new_tx.due_date.strftime('%d/%m/%Y')}.",
+                    type="borrow_success"
+                )
+                db.add(borrow_notif)
+            except Exception as e:
+                print(f"Lỗi khi tạo thông báo mượn sách: {e}")
 
         # Không cần gửi mail theo yêu cầu
                 
@@ -1541,6 +1567,18 @@ def update_return_request_status(request_id: int, payload: dict, db: Session = D
                         ongoing_tx.total_fee = penalty_fee
                     else:
                         ongoing_tx.total_fee = 0
+                        
+                    # Thêm thông báo trả sách thành công
+                    try:
+                        return_notif = models.Notification(
+                            user_id=req.user_id,
+                            title="Trả sách thành công ✔️",
+                            content=f"Cảm ơn bạn đã trả cuốn sách '{book.title}'. Giao dịch của bạn đã hoàn tất.",
+                            type="return_success"
+                        )
+                        db.add(return_notif)
+                    except Exception as e:
+                        print(f"Lỗi khi tạo thông báo trả sách: {e}")
 
     req.status = status
     db.commit()
@@ -1748,6 +1786,22 @@ def toggle_favorite(favorite: schemas.FavoriteBase, db: Session = Depends(get_db
         db_fav = models.Favorite(**favorite.dict())
         db.add(db_fav)
         db.commit()
+        
+        # Thêm thông báo thích sách
+        try:
+            book = db.query(models.Book).filter(models.Book.book_id == favorite.book_id).first()
+            if book:
+                like_notif = models.Notification(
+                    user_id=favorite.user_id,
+                    title="Đã thích sách",
+                    content=f"Bạn đã thích cuốn sách '{book.title}'. Hãy ghé thư viện mượn đọc nhé!",
+                    type="like"
+                )
+                db.add(like_notif)
+                db.commit()
+        except Exception as e:
+            print(f"Lỗi khi tạo thông báo thích sách: {e}")
+            
         return {"status": "added"}
 
 @app.get("/api/users/{user_id}/favorites", response_model=List[schemas.BookResponse])
@@ -1795,10 +1849,55 @@ def notify_due_books(background_tasks: BackgroundTasks, db: Session = Depends(ge
                 
             # Kiểm tra nếu hạn trả sách trong vòng 3 ngày tới hoặc đã quá hạn
             days_left = (due_date - today).days
+            
+            # --- Tạo thông báo trong hệ thống nếu có user và book ---
+            user = db.query(models.User).filter(models.User.user_id == tx.user_id).first()
+            book = db.query(models.Book).filter(models.Book.book_id == tx.book_id).first()
+            
+            if user and book:
+                # 1. Gửi thông báo 3 ngày trước hạn
+                if days_left == 3:
+                    # Kiểm tra trùng lặp để tránh spam thông báo mỗi lần chạy cron
+                    notif_exists = db.query(models.Notification).filter(
+                        models.Notification.user_id == user.user_id,
+                        models.Notification.type == "due_countdown_3d",
+                        models.Notification.content.like(f"%{book.title}%")
+                    ).first()
+                    if not notif_exists:
+                        try:
+                            due_3d_notif = models.Notification(
+                                user_id=user.user_id,
+                                title="Sách sắp hết hạn (Còn 3 ngày) ⏳",
+                                content=f"Cuốn sách '{book.title}' của bạn sẽ hết hạn vào ngày {due_date.strftime('%d/%m/%Y')}. Hãy chú ý sắp xếp trả sách đúng hạn nhé!",
+                                type="due_countdown_3d"
+                            )
+                            db.add(due_3d_notif)
+                            db.commit()
+                        except Exception as e:
+                            print(f"Lỗi khi tạo thông báo do sắp hết hạn 3 ngày: {e}")
+                            
+                # 2. Gửi thông báo 1 ngày trước hạn (Ngày cuối)
+                elif days_left == 1:
+                    notif_exists = db.query(models.Notification).filter(
+                        models.Notification.user_id == user.user_id,
+                        models.Notification.type == "due_countdown_1d",
+                        models.Notification.content.like(f"%{book.title}%")
+                    ).first()
+                    if not notif_exists:
+                        try:
+                            due_1d_notif = models.Notification(
+                                user_id=user.user_id,
+                                title="Hạn trả sách là ngày mai! ⚠️",
+                                content=f"Cuốn sách '{book.title}' sắp hết hạn. Mai hãy lên thư viện nộp để tránh phát sinh phí trễ hạn nhé!",
+                                type="due_countdown_1d"
+                            )
+                            db.add(due_1d_notif)
+                            db.commit()
+                        except Exception as e:
+                            print(f"Lỗi khi tạo thông báo do sắp hết hạn 1 ngày: {e}")
+            
+            # --- Gửi email thông báo ---
             if days_left <= 3:
-                user = db.query(models.User).filter(models.User.user_id == tx.user_id).first()
-                book = db.query(models.Book).filter(models.Book.book_id == tx.book_id).first()
-                
                 if user and user.email and book:
                     # Tính phí trễ hạn = 10% giá trị sách
                     penalty_fee = float(book.market_price or 0.0) * 0.10
@@ -1806,7 +1905,7 @@ def notify_due_books(background_tasks: BackgroundTasks, db: Session = Depends(ge
                     html_content = email_utils.get_due_reminder_template(
                         full_name=user.full_name,
                         book_title=book.title,
-                        due_date=return_date.strftime("%d/%m/%Y"),
+                        due_date=due_date.strftime("%d/%m/%Y"),
                         penalty_fee=penalty_fee
                     )
                     
@@ -1820,4 +1919,34 @@ def notify_due_books(background_tasks: BackgroundTasks, db: Session = Depends(ge
         except Exception as e:
             print(f"Lỗi khi xử lý thông báo cho transaction {tx.transaction_id}: {e}")
             
-    return {"message": f"Đã gửi {notified_count} email nhắc nhở thành công."}
+    return {"message": f"Đã xử lý thông báo thành công. Đã gửi {notified_count} email nhắc nhở."}
+
+# ==============================================================================
+# Notifications
+# ==============================================================================
+@app.get("/api/notifications/{user_id}", response_model=List[schemas.NotificationResponse])
+def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
+    """Lấy danh sách thông báo của người dùng, sắp xếp mới nhất lên đầu."""
+    return db.query(models.Notification).filter(
+        models.Notification.user_id == user_id
+    ).order_by(models.Notification.created_at.desc()).all()
+
+@app.put("/api/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, db: Session = Depends(get_db)):
+    """Đánh dấu một thông báo đã đọc."""
+    notif = db.query(models.Notification).filter(models.Notification.notification_id == notification_id).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Không tìm thấy thông báo")
+    notif.is_read = True
+    db.commit()
+    return {"message": "Đã đánh dấu đã đọc"}
+
+@app.put("/api/notifications/user/{user_id}/read-all")
+def mark_all_notifications_read(user_id: int, db: Session = Depends(get_db)):
+    """Đánh dấu tất cả thông báo của người dùng là đã đọc."""
+    db.query(models.Notification).filter(
+        models.Notification.user_id == user_id,
+        models.Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"message": "Đã đánh dấu đọc tất cả thông báo"}

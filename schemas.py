@@ -279,3 +279,21 @@ class UserUpdateSecure(BaseModel):
     email: str
     phone_number: str
     nfc_serial: str
+
+# --- Notification Schemas ---
+class NotificationBase(BaseModel):
+    user_id: int
+    title: str
+    content: str
+    type: str
+    is_read: bool = False
+
+class NotificationCreate(NotificationBase):
+    pass
+
+class NotificationResponse(NotificationBase):
+    notification_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
