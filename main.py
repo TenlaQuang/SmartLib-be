@@ -789,8 +789,31 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
 # Registration & PayOS Payment
 # ==============================================================================
 @app.post("/api/create-payment-link")
-def create_payment_link(payload: schemas.PayosLinkCreate):
+def create_payment_link(payload: schemas.PayosLinkCreate, db: Session = Depends(get_db)):
     """Tạo link thanh toán PayOS mà chưa lưu thông tin đăng ký vào DB."""
+    # 1. Kiểm tra xem mã sinh viên này đã tồn tại trong bảng users chưa
+    existing_user = db.query(models.User).filter(models.User.user_code == payload.user_code).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Mã sinh viên này đã là thành viên thư viện!")
+        
+    # 2. Kiểm tra xem mã sinh viên này đã tồn tại trong bảng registration_requests chưa
+    existing_req = db.query(models.RegistrationRequest).filter(
+        models.RegistrationRequest.user_code == payload.user_code
+    ).first()
+    if existing_req:
+        if existing_req.request_status == "pending":
+            raise HTTPException(status_code=400, detail="Đơn đăng ký của bạn đang chờ phê duyệt, không cần đăng ký lại!")
+        elif existing_req.request_status == "approved":
+            raise HTTPException(status_code=400, detail="Đơn đăng ký của bạn đã được duyệt và đang chờ kích hoạt thẻ NFC!")
+        else:
+            # Nếu bị từ chối trước đó, cho phép đăng ký lại bằng cách xóa đơn cũ bị từ chối
+            try:
+                db.delete(existing_req)
+                db.commit()
+            except Exception as clean_err:
+                db.rollback()
+                print(f"Lỗi khi xóa đơn bị từ chối cũ: {clean_err}")
+
     order_code = int(f"{int(time.time())}") 
     try:
         payment_request = CreatePaymentLinkRequest(
@@ -1992,3 +2015,13 @@ def mark_all_notifications_read(user_id: int, db: Session = Depends(get_db)):
     ).update({"is_read": True})
     db.commit()
     return {"message": "Đã đánh dấu đọc tất cả thông báo"}
+
+@app.get("/api/users/{user_id}/check-ongoing-borrow/{isbn}")
+def check_user_ongoing_borrow(user_id: int, isbn: str, db: Session = Depends(get_db)):
+    """Kiểm tra xem sinh viên có đang mượn sách có mã ISBN này hay không."""
+    tx = db.query(models.Transaction).join(models.Book).filter(
+        models.Transaction.user_id == user_id,
+        models.Book.isbn == isbn,
+        models.Transaction.status == "ongoing"
+    ).first()
+    return {"is_borrowed": tx is not None}
