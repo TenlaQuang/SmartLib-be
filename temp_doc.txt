@@ -1,0 +1,709 @@
+TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG VIỆT - HÀN
+KHOA KHOA HỌC MÁY TÍNH
+Báo Cáo Đồ Án Chuyên Ngành 1
+TÊN ĐỀ TÀI
+HỆ SINH THÁI THƯ VIỆN THÔNG MINH TÍCH HỢP XÁC THỰC NFC VÀ NHẬN DIỆN AI
+Sinh viên thực hiện: 
+Trần 
+Lê Nguyên Hải
+Lê Hữu Thái
+23IT.EB0
+3
+1
+23IT.EB0
+91
+Lớp:
+23
+ITe1
+Giảng viên hướng dẫn:
+ 
+TS.Nguyễn Đức Hiển
+     
+TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG VIỆT - HÀN
+KHOA KHOA HỌC MÁY TÍNH
+Báo Cáo Đồ Án Chuyên Ngành 1
+TÊN ĐỀ TÀI
+HỆ SINH THÁI THƯ VIỆN THÔNG MINH TÍCH HỢP XÁC THỰC NFC VÀ NHẬN DIỆN AI
+Sinh viên thực hiện: 
+Trần Lê Nguyên Hải
+Lê Hữu Thái
+23IT.EB031
+23IT.EB091
+Lớp:
+23ITe1
+Giảng viên hướng dẫn:
+ 
+TS.Nguyễn Đức Hiển
+     
+Lời cảm ơn!
+Để tạo được sản phẩm này, nhóm chúng em đã nhận được rất nhiều sự trợ giúp và hướng dẫn từ thầy 
+TS.Nguyễn Đức Hiển
+Với tình cảm sâu sắc và chân thành, cho phép chúng em được bày tỏ lòng biết ơn đến quý thầy cô và tất cả các bạn đã cùng nhau giúp đỡ và nghiên cứu trong suốt quá trình thực hiện đề tài. Với thời gian và kinh nghiệm có hạn, báo cáo này không tránh khỏi những thiếu sót. Chúng em mong nhận được sự chỉ bảo và góp ý của các thầy cô giáo, từ đó chúng em có thể bổ sung, hoàn thiện kinh nghiệm và phục vụ tốt hơn cho các đồ án sau.
+Nhóm của chúng em xin chân thành cảm ơn!
+ 
+    
+ 
+Sinh viên
+,
+        
+ 
+Trần Lê Nguyên Hải
+                    
+ 
+Lê Hữu Thái
+NHẬN XÉT CỦA GIẢNG VIÊN HƯỚNG DẪN
+ Chữ ký của giảng viên hướng dẫn
+MỤC LỤC
+LỜI CẢM ƠN
+ii
+NHẬN XÉT CỦA GIẢNG VIÊN HƯỚNG DẪN
+iii
+GIỚI THIỆU
+1
+CHƯƠNG 1: TỔNG QUAN VỀ ĐỀ TÀI
+2
+1.1. Lý do chọn đề tài
+2
+1.2. Nhiệm vụ nghiên cứu
+2
+1.3. Mục tiêu nghiên cứu
+2
+1.4. Đối tượng và phạm vi nghiên cứu
+3
+1.4.1. Đối tượng nghiên cứu
+3
+1.4.2. Phạm vi nghiên cứu
+3
+1.5. Phương pháp nghiên cứu
+3
+1.5.1. Phương pháp phân tích tổng hợp kinh nghiệm
+3
+1.5.2. Phương pháp quan sát và tra tài liệu
+3
+1.5.3. Phương pháp triển khai thực nghiệm
+4
+1.6. Dự kiến kết quả
+4
+1.7. Ý nghĩa khoa học và thực tiễn
+4
+1.7.1. Ý nghĩa khoa học
+4
+1.7.2. Ý nghĩa thực tiễn
+4
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT
+5
+2.1. Tổng quan về hệ thống quản lý thư viện thông minh (Smart Library)
+5
+2.2. Công nghệ nhận dạng tần số vô tuyến
+5
+2.2.1. Nguyên lý hoạt động của NFC
+5
+2.2.2. Các chuẩn bảo mật và ứng dụng định danh trong thư viện
+5
+2.3. Hệ thống gợi ý sách tự động và Lọc nội dung
+5
+2.3.1. Thuật toán phân tích đặc trưng văn bản TF-IDF
+6
+2.3.2. Độ tương đồng Cosine (Cosine Similarity) trong gợi ý sách
+6
+2.4. Các công cụ và môi trường phát triển phần mềm
+6
+2.4.1. Ngôn ngữ lập trình Python và hệ sinh thái AI
+6
+2.4.2. Thư viện phân tích dữ liệu Pandas và NumPy
+7
+2.4.3. Thư viện khoa học học máy Scikit-Learn
+7
+2.4.4. Hệ quản trị cơ sở dữ liệu PostgreSQL và cơ chế lập trình đa luồng
+7
+CHƯƠNG 3: PHÂN TÍCH THIẾT KẾ HỆ THỐNG
+8
+3.1. Mô tả bài toán và quy trình nghiệp vụ mượn/trả sách thông minh
+8
+3.2. Phân tích yêu cầu hệ thống
+8
+3.2.1. Yêu cầu chức năng (Functional Requirements)
+8
+3.2.2. Yêu cầu phi chức năng (Non-functional Requirements)
+8
+3.3. Thiết kế kiến trúc hệ thống (System Architecture)
+8
+3.3.1. Kiến trúc phần cứng (Hardware Architecture)
+8
+3.3.2. Kiến trúc phần mềm (Software Architecture)
+9
+3.4. Thiết kế Cơ sở dữ liệu (Database Design)
+9
+3.5. Mô hình hóa hệ thống bằng ngôn ngữ UML
+1
+0
+3.5.1. Biểu đồ Use Case (Các tác nhân và chức năng)
+1
+0
+3.5.2. Biểu đồ Tuần tự (Sequence Diagram) cho quy trình mượn/trả
+10
+3.5.3. Biểu đồ Hoạt động (Activity Diagram)
+1
+0
+3.6. Kịch bản kiểm thử và đảm bảo chất lượng (QA Testing)
+1
+0
+3.7. Các biểu đồ thiết kế hệ thống UML
+1
+0
+3.7.1 Biểu đồ Use Case tổng quát
+1
+1
+3.7.2. Các biểu đồ Use case chi tiết
+1
+2
+a. Biểu đồ Use Case chi tiết đối với tác nhân Sinh viên (Mobile App)
+1
+2
+3.7.3 Biểu đồ Sequence (Biểu đồ tuần tự)
+13
+3.7.4 Biểu đồ Active (Biểu đồ hoạt động)
+14
+3.7.5. Biểu đồ State (Biểu đồ trạng thái)
+15
+3.7.6 Biểu đồ Communicate (Biểu đồ giao tiếp)
+16
+CHƯƠNG 4: 
+TRIỂN KHAI VÀ KẾT QUẢ THỰC HIỆN
+17
+4.1. 
+Giao diện Website (admin)
+18
+4.1.1. 
+Giao diện 
+tổng quan
+18
+4.1.2. 
+Giao di
+ện
+ xếp sách &
+ vị trí
+19
+4.1.3. 
+Giao diện 
+quản lý sách
+20
+4.1.4. 
+Giao 
+diện
+ 
+mượn/trả
+20
+4.1.5. 
+Giao 
+diện
+ tài khoản &
+ NFC
+21
+4.2. 
+Giao diện App (user)
+ 
+22
+4.2.1.
+ Giao diện trang chủ
+22
+4.2.2.
+ 
+Giao diện đăng lý thẻ SmartLib
+23
+4.2.3. 
+Giao diện 
+đăng ký tài khoản
+……………………………………………
+..
+…….
+24
+4.2.4.
+ Giao
+ diện 
+thanh toán
+25
+4.2.5.
+ 
+Giao diện đọc thẻ NFC………………………………………………………..
+26
+4.2.6.
+ 
+Giao diện SmartLib Home……………………………………………………
+27
+4.2.7.
+ 
+Giao diện mượn sách…………………………………………………………..
+28
+4.2.8
+.
+ 
+Giao diện trả sách………………………………………………………………
+29
+4.2.9.
+ 
+Giao diện tài khoản
+…………………………………………………………….
+30
+4.3. Thiết kế giao diện và mô tả trải nghiệm người dùng (UI/UX)
+3
+0
+4.3.1. Các màn hình chức năng trên Mobile App (Sinh viên)
+3
+0
+4.3.2. Các phân hệ trên Web Admin Dashboard (Thủ thư)
+3
+1
+4.4. Kịch bản kiểm thử chi tiết và Đảm bảo chất lượng (QA Testing)
+3
+2
+CHƯƠNG 5: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
+3
+3
+5.1. Tổng kết kết quả đạt được
+3
+2
+5.2. Những hạn chế còn tồn tại
+33
+5.3. Hướng phát triển trong tương lai
+33
+5.4. Kết luận chung
+33
+TÀI LIỆU THAM KHẢO
+34
+GIỚI THIỆU
+Trong kỷ nguyên của cuộc Cách mạng Công nghiệp 4.0, chuyển đổi số không còn là một lựa chọn mà đã trở thành yêu cầu bắt buộc đối với các cơ sở giáo dục đại học nhằm tối ưu hóa quy trình quản lý và nâng cao chất lượng dịch vụ đào tạo. Một trong những khu vực trọng điểm cần được hiện đại hóa chính là thư viện – nơi lưu trữ và điều phối nguồn học liệu khổng lồ. Tuy nhiên, thực tế tại nhiều thư viện hiện nay vẫn đang vận hành dựa trên các phương thức truyền thống hoặc bán tự động như sử dụng mã vạch (Barcode), dẫn đến nhiều hạn chế về thời gian xử lý và sai sót trong kiểm kê.
+Nhận thấy tiềm năng to lớn của Trí tuệ nhân tạo (AI) trong việc tự động hóa thị giác và công nghệ Giao tiếp tầm ngắn (NFC) trong việc định danh bảo mật, nhóm chúng em quyết định thực hiện đề tài: 
+"Xây dựng hệ thống quản lý thư viện thông minh dựa trên nền tảng AI và NFC"
+. Đồ án này không chỉ đơn thuần là một bài tập lập trình, mà là một giải pháp tích hợp phần cứng và phần mềm, hướng tới việc xây dựng mô hình "Smart Campus" tại trường. Chúng em tập trung vào việc giải quyết bài toán mượn/trả sách hàng loạt (multi-object recognition) kết hợp với xác thực thẻ sinh viên tức thời, qua đó mang lại trải nghiệm hiện đại, nhanh chóng và chính xác tuyệt đối cho cả sinh viên lẫn cán bộ quản lý.
+CHƯƠNG 1: TỔNG QUAN VỀ ĐỀ TÀI
+1.1.  Lý do chọn đề tài: 
+Hiện nay, nhu cầu tra cứu và mượn trả tài liệu tại các thư viện đại học đang tăng cao. Quy trình quét mã vạch truyền thống tồn tại một số hạn chế: mã vạch dễ bị mờ, rách sau thời gian sử dụng; thao tác tìm vị trí quét trên từng cuốn sách tốn thời gian; và việc quản lý thẻ thành viên thủ công tiềm ẩn rủi ro sai lệch dữ liệu. Nhằm tối ưu hóa quy trình này, đề tài đề xuất ứng dụng các mô hình Deep Learning (CNN, EfficientNet) để nhận diện hình ảnh bìa sách, kết hợp cùng công nghệ NFC (Near Field Communication) trên thẻ sinh viên. Giải pháp này hướng đến việc hỗ trợ nhận diện nhiều tài liệu cùng lúc và xác thực người dùng nhanh chóng, từ đó tự động hóa khâu mượn trả, tiết kiệm thời gian cho sinh viên và giảm tải công việc cho nhân viên thư viện.
+1.2. Nhiệm vụ nghiên cứu:
+Nhiệm vụ trọng tâm của đồ án được chia thành các giai đoạn kỹ thuật sau:
+Thu thập và tiền xử lý dữ liệu: Thu thập dữ liệu ảnh bìa sách thực tế tại thư viện, tiến hành tiền xử lý và gắn nhãn để xây dựng tập dữ liệu (Dataset) phục vụ huấn luyện.
+Xây dựng mô hình AI: Triển khai và huấn luyện các kiến trúc mạng nơ-ron (EfficientNet, ResNet) nhằm tối ưu khả năng phân loại, nhận diện đầu sách trong các điều kiện môi trường khác nhau (ánh sáng yếu, sách đặt lệch).
+Tích hợp phần cứng NFC: Lập trình điều khiển module đọc thẻ NFC, xây dựng giao thức truyền nhận dữ liệu giữa đầu đọc và máy chủ để xác thực thông tin sinh viên.
+Phát triển Module Logic và Database: Thiết kế cơ sở dữ liệu (MySQL hoặc Supabase) và các module logic để quản lý đồng bộ trạng thái sách, thông tin người dùng và lịch sử mượn trả.
+Kiểm thử 
+hệ thống 
+(QA): Xây dựng kịch bản 
+và thực hiện 
+kiểm 
+thử
+ (Unit Test, Integration Test) 
+nhằm
+ đảm bảo hệ thống 
+xử lý tốt các
+ ngoại lệ 
+phát sinh (
+thẻ lỗi, sách chưa có 
+dữ liệu, mất
+ kết nối mạng
+).
+1.3. Mục tiêu nghiên cứu: 
+Mục tiêu tổng quát:
+ Phát triển một hệ thống Kiosk thư viện hoạt động theo cơ chế tự phục vụ (Self-service), cho phép sinh viên đặt sách lên bàn và quẹt thẻ để hoàn tất giao dịch mượn/trả mà không cần sự can thiệp trực tiếp của thủ thư.
+Mục tiêu cụ thể:
+Xây dựng hệ thống có khả năng nhận diện nhiều tài liệu cùng lúc và cập nhật trạng thái tự động lên cơ sở dữ liệu.
+Tối ưu hóa quy trình mượn trả, hướng đến mục tiêu giảm thiểu 80% thời gian chờ đợi tại quầy thủ thư so với phương pháp truyền thống.
+Tăng cường tính minh bạch, độ chính xác trong công tác thống kê và quản lý tài sản của nhà trường.
+1.4. Đối tượng và phạm vi nghiên cứu
+1.4.1. Đối tượng nghiên cứu:
+Các thuật toán học sâu chuyên sâu về Thị giác máy tính (Computer Vision) dùng cho nhận diện hình ảnh.
+Công nghệ nhận dạng tần số vô tuyến tầm ngắn (NFC) và các tiêu chuẩn bảo mật liên quan.
+Quy trình nghiệp vụ thực tế của hệ thống quản lý thư viện.
+1.4.2. Phạm vi nghiên cứu:
+Về không gian: Hệ thống được thiết kế để triển khai thử nghiệm tại phòng đọc và khu vực mượn trả của thư viện trường.
+Về dữ liệu: Tập trung xử lý các loại sách giáo trình, tài liệu chuyên ngành và tạp chí khoa học đang lưu hành tại thư viện.
+Về công nghệ: Sử dụng thiết bị camera độ phân giải cao và đầu đọc thẻ NFC, đảm bảo tương thích hoàn toàn với thẻ sinh viên hiện hành.
+1.5. Phương pháp nghiên cứu
+1.5.1. Phương pháp phân tích tổng hợp kinh nghiệm.
+Nghiên cứu các hệ thống quản lý thư viện hiện hành (ví dụ: công nghệ RFID), phân tích ưu điểm và rào cản về chi phí triển khai.
+Đề xuất và đánh giá tính khả thi của giải pháp thay thế dựa trên công nghệ nhận diện hình ảnh (AI) kết hợp NFC, nhằm tối ưu chi phí đầu tư phần cứng trong khi vẫn đảm bảo hiệu quả vận hành.
+ 1.5.2. Phương pháp quan sát và tra tài liệu 
+Tra cứu các nghiên cứu khoa học, tài liệu kỹ thuật trên các cơ sở dữ liệu học thuật (Google Scholar, IEEE) liên quan đến tối ưu hóa mạng nơ-ron và các API giao tiếp thiết bị ngoại vi.
+Khảo sát trực tiếp quy trình mượn/trả tài liệu hiện tại tại thư viện, tổng hợp các ngoại lệ, thao tác sai thường gặp của người dùng để làm cơ sở xây dựng kịch bản xử lý (use-case) cho phần mềm.
+ 1.5.3. Phương pháp triển khai thực nghiệm 
+Triển khai thực nghiệm bằng cách lắp ráp mô hình phần cứng và chạy thử nghiệm thuật toán trên nhiều tập mẫu sách khác nhau.
+Áp dụng phương pháp "Thử và Sai" (Trial and Error) trong quá trình huấn luyện mô hình AI để tinh chỉnh các siêu tham số (hyper-parameters) như Learning Rate, Batch Size, hướng đến mục tiêu mô hình đạt độ chính xác trên 95% trên tập kiểm thử.
+1.6. Dự kiến kết quả
+Dự án dự kiến sẽ bàn giao một hệ thống hoàn chỉnh bao gồm:
+Ứng dụng Client (
+App
+): Giao diện tương tác dành cho sinh viên thực hiện thao tác tự phục vụ.
+Mô hình AI: Mô hình nhận diện hình ảnh bìa sách
+ 
+đảm bảo khả năng xử lý thời gian thực với độ trễ thấp.
+Hệ thống Quản trị (Backend & Dashboard): Hệ thống lưu trữ dữ liệu tập trung, cung cấp giao diện Dashboard hỗ trợ nhân viên thư viện theo dõi, thống kê và tự động hóa quy trình quản lý kho tài liệu.
+1.7. Ý nghĩa khoa học và thực tiễn
+1.7.1. Ý nghĩa khoa học 
+Đóng góp một mô hình thực nghiệm về việc kết hợp đa công nghệ (AI + IoT) trong một hệ thống thống nhất. Đề tài chứng minh khả năng ứng dụng của các mạng nơ-ron phức tạp vào các thiết bị đầu cuối có cấu hình vừa phải nhưng vẫn đảm bảo hiệu năng xử lý.
+1.7.2. Ý nghĩa thực tiễn 
+Giải quyết triệt để bài toán ùn tắc tại thư viện, thúc đẩy tinh thần tự học của sinh viên thông qua việc đơn giản hóa thủ tục hành chính. Đây là bước đệm quan trọng để mở rộng ra các hệ thống quản lý tài sản thông minh khác trong khuôn viên nhà trường.
+CHƯƠNG 2: CƠ SỞ LÝ THUYẾT.
+2.1. Tổng quan về hệ thống quản lý thư viện thông minh (Smart Library)
+Bản chất hệ thống: Sự tích hợp giữa hạ tầng vật lý và công nghệ tự động hóa nhằm số hóa quy trình lưu thông tài liệu.
+Cơ chế vận hành cốt lõi: Tự phục vụ (Self-service).
+Mục tiêu chức năng:
+Cung cấp công cụ để sinh viên chủ động thực hiện giao dịch mượn/trả không cần thủ thư.
+Trích xuất dữ liệu thống kê thời gian thực về tình trạng tài sản và xu hướng mượn tài liệu.
+2.2. 
+Công nghệ nhận dạng tần số vô tuyến tầm ngắn (NFC)
+2.2.1. Nguyên lý hoạt động của NFC
+Phân loại: Nhánh con của công nghệ RFID.
+Tần số hoạt động: 13.56 MHz.
+Cơ sở vật lý: Giao tiếp thông qua hiện tượng cảm ứng điện từ giữa hai cuộn cảm.
+Luồng xử lý định danh:
+Đầu đọc (NFC Reader) phát ra từ trường.
+Thẻ sinh viên (NFC Tag) tiến vào vùng từ trường, nhận năng lượng cảm ứng.
+Thẻ truyền mã định danh duy nhất (UID) về đầu đọc để xử lý.
+2.2.2. Các chuẩn bảo mật và ứng dụng định danh trong thư viện
+Tiêu chuẩn bảo mật sử dụng: ISO/IEC 14443.
+Ưu điểm triển khai trong hệ thống:
+Thay thế thao tác quét mã vạch quang học truyền thống.
+Hạn chế tối đa rủi ro sao chép hoặc làm giả thẻ sinh viên.
+Tăng tốc độ xác thực, đáp ứng yêu cầu của quy trình giao dịch "không chạm" (contactless).
+2.3. Hệ thống gợi ý sách tự động và Lọc nội dung (Recommendation Systems & Content-Based Filtering)
+Vai trò trong dự án SmartLib: Hỗ trợ sinh viên khám phá các đầu sách liên quan đến chủ đề đang nghiên cứu.
+Thuật toán cốt lõi: Lọc dựa trên nội dung (Content-Based Filtering).
+Luồng hoạt động của thuật toán:
+Trích xuất đặc trưng (metadata) của sách: thể loại, tác giả, từ khóa, tóm tắt.
+Tạo vector đặc trưng cho từng tài liệu và vector hồ sơ người dùng (dựa trên lịch sử mượn).
+Tính toán độ tương đồng (ví dụ: Cosine Similarity) giữa sách và hồ sơ.
+Trả về danh sách Top-N tài liệu có độ tương đồng cao nhất để đề xuất trên giao diện.
+2.3.1. Thuật toán phân tích đặc trưng văn bản TF-IDF
+Thuật toán TF-IDF (Term Frequency - Inverse Document Frequency) được áp dụng nhằm trích xuất đặc trưng và vector hóa dữ liệu văn bản của các tài liệu sách (bao gồm tên sách, tác giả và mô tả chi tiết). Ý tưởng cốt lõi của thuật toán được cấu thành từ hai yếu tố. Thứ nhất, Term Frequency (TF) đo lường tần suất xuất hiện của từ khóa trong một tài liệu; trọng số sẽ tỷ lệ thuận với số lần từ khóa xuất hiện. Thứ hai, Inverse Document Frequency (IDF) đánh giá mức độ phổ biến của từ khóa trên toàn bộ cơ sở dữ liệu thư viện; thuật toán sẽ giảm trọng số của các từ phổ biến và làm nổi bật các từ đặc trưng. Kết quả của quá trình tính toán là một ma trận, trong đó mỗi tài liệu được biểu diễn dưới dạng một vector số thực.
+2.3.2. Độ tương đồng Cosine (Cosine Similarity) trong gợi ý sách
+Sau khi các tài liệu được số hóa thành vector đặc trưng, phương pháp khoảng cách Cosine Similarity được sử dụng để tính toán mức độ tương đồng nội dung. Nguyên lý của phương pháp này là đánh giá độ tương đồng dựa trên góc hợp bởi hai vector trong không gian đa chiều. Khi góc càng hẹp (giá trị Cosine tiến về 1), nội dung giữa hai tài liệu càng tương đồng và ngược lại. Trong quá trình thực thi tại file 
+recommender.py
+, hệ thống tính toán ma trận độ tương đồng cho toàn bộ tập dữ liệu, sau đó áp dụng ngưỡng lọc tối thiểu (loại bỏ các kết quả < 0.05). Cuối cùng, danh sách được sắp xếp giảm dần để trích xuất Top 5 tài liệu liên quan nhất và lưu vào cơ sở dữ liệu phục vụ giao diện người dùng.
+2.4. Các công cụ và môi trường phát triển phần mềm
+2.4.1. Ngôn ngữ lập trình Python và hệ sinh thái AI
+Python được chọn làm ngôn ngữ phát triển chính do sở hữu hệ sinh thái thư viện hỗ trợ AI và IoT vô cùng phong phú. Khả năng tương thích tốt với các phần cứng ngoại vi và tốc độ triển khai nhanh chóng giúp Python trở thành lựa chọn tối ưu cho các dự án tích hợp hệ thống phức tạp.
+2.4.2. Thư viện phân tích dữ liệu Pandas và NumPy
+Pandas và NumPy là hai thư viện cốt lõi đảm nhiệm khâu xử lý dữ liệu của hệ thống. Pandas được sử dụng để truy xuất dữ liệu từ PostgreSQL, xử lý các giá trị khuyết thiếu (Null/None) và cấu trúc hóa dữ liệu dưới dạng DataFrame. Song song đó, NumPy cung cấp cấu trúc mảng đa chiều, giúp tối ưu hóa hiệu năng cho các phép toán tính toán ma trận trong thuật toán phân tích độ tương đồng.
+2.4.3. Thư viện khoa học học máy Scikit-Learn
+Để triển khai hệ thống gợi ý, dự án sử dụng các hàm có sẵn từ thư viện Scikit-Learn. API 
+TfidfVectorizer
+ được tích hợp để chạy toàn bộ quy trình tiền xử lý, bao gồm tách từ, lọc từ dừng (stop words) và tính toán ma trận trọng số. API 
+cosine_similarity 
+được sử dụng để thực thi phép toán đo lường góc giữa các vector tài liệu.
+2.4.4. Hệ quản trị cơ sở dữ liệu PostgreSQL và cơ chế lập trình đa luồng (Multi-threading)
+Dữ 
+ liệu 
+của hệ thống 
+được 
+lưu trữ và 
+quản lý bởi PostgreSQL
+,
+ đảm bảo tính 
+toàn vẹn dữ liệu thông qua các 
+ràng buộc ACID
+. Tại tầng Backend, để giải quyết bài toán hiệu năng khi có nhiều yêu cầu kết nối
+, kỹ thuật 
+xử lý 
+đa luồng 
+(Multi-threading) và 
+bất đồng bộ (Async/Await) được áp dụng
+. Luồng 
+xử lý các yêu cầu HTTP 
+(RESTful API) được tách biệt hoàn toàn với
+ luồng truyền thông điệp thời gian thực
+ (WebSocket),
+ giúp hệ thống 
+tránh được tình trạng thắt
+ cổ chai 
+(blocking I/O).
+CHƯƠNG 3: PHÂN TÍCH THIẾT KẾ HỆ THỐNG
+3.1. Mô tả bài toán và quy trình nghiệp vụ mượn/trả sách thông minh
+Bài toán tập trung vào việc thay thế quy trình thủ công tại quầy bằng một Kiosk tự động. Quy trình bắt đầu khi sinh viên thực hiện quẹt thẻ NFC để định danh. Sau đó, sinh viên đặt các cuốn sách cần mượn lên mặt bàn có trang bị camera. AI sẽ nhận diện đồng thời tất cả các cuốn sách, đối chiếu với cơ sở dữ liệu để kiểm tra tình trạng sách và quyền mượn của sinh viên, sau đó thực hiện ghi nhận giao dịch vào hệ thống.
+3.2. Phân tích yêu cầu hệ thống
+ 3.2.1. Yêu cầu chức năng (Functional Requirements)
+Xác thực người dùng: Đọc thông tin từ thẻ NFC và kiểm tra trạng thái tài khoản sinh viên.
+Nhận diện bìa sách tự động: Sử dụng AI để bóc tách thông tin tên sách, tác giả từ hình ảnh bìa.
+Xử lý mượn/trả hàng loạt: Cho phép xử lý nhiều cuốn sách trong cùng một giao dịch để tiết kiệm thời gian.
+Quản lý CSDL: Lưu trữ lịch sử mượn trả, quản lý kho sách và thông báo sách quá hạn. 
+3.2.2. Yêu cầu phi chức năng (Non-functional Requirements)
+Độ chính xác: Tỷ lệ nhận diện đúng đầu sách phải đạt trên 95%.
+Thời gian đáp ứng: Toàn bộ quá trình từ khi quét thẻ đến khi hoàn tất giao dịch không quá 5-10 giây.
+Tính ổn định: Hệ thống có khả năng hoạt động liên tục và xử lý được các lỗi mất kết nối tạm thời.
+Giao diện: Thân thiện, dễ hiểu, phù hợp với đối tượng sinh viên.
+3.3. Thiết kế kiến trúc hệ thống (System Architecture)
+3.3.1. Kiến trúc phần cứng (Hardware Architecture)
+Kiến trúc phần cứng bao gồm một máy tính điều khiển trung tâm kết nối với các thiết bị ngoại vi:
+Kiosk/Màn hình cảm ứng: Nơi hiển thị giao diện tương tác (UI) cho sinh viên.
+Camera High-Definition: Cố định phía trên mặt bàn, thu thập khung hình chứa sách.
+NFC Reader (ISO/IEC 14443): Thiết bị đọc mã UID từ thẻ sinh viên.
+3.3.2. Kiến trúc phần mềm (Software Architecture) Phần mềm được thiết kế theo mô hình 3 lớp:
+Presentation Layer (Lớp giao diện):
+ 
+Ứng dụng di động/Kiosk (Flutter), tiếp nhận tương tác từ người dùng.
+Business Logic Layer (Lớp xử lý nghiệp vụ): Backend trung tâm, chứa các module cốt lõi: Module xử lý ảnh (AI Inference) và Module giao tiếp phần cứng (NFC Controller).
+Data Access Layer (Lớp truy xuất dữ liệu): Cổng giao tiếp với hệ quản trị CSDL, thực thi các truy vấn thêm/xóa/sửa trạng thái tài sản.
+3.4. Thiết kế Cơ sở dữ liệu (Database Design)
+Cơ sở dữ liệu được chuẩn hóa để đảm bảo tính toàn vẹn, bao gồm các thực thể cốt lõi:
+Bảng 
+SinhVien
+: Lưu trữ thông tin người dùng (Khóa chính: 
+UID_The
+, Họ tên, Lớp, Trạng thái tài khoản).
+Bảng 
+Sach
+: Quản lý thông tin tài liệu (Khóa chính: 
+ID_Sach
+, Tên sách, Tác giả, Đường dẫn ảnh bìa mẫu, Trạng thái [Trong kho/Đang mượn]).
+Bảng 
+PhieuMuon
+: Lưu trữ lịch sử giao dịch (Khóa chính: 
+ID_Phieu
+, Khóa ngoại: 
+UID_The
+, 
+ID_Sach
+, Thời gian mượn, Hạn trả, Thời gian trả thực tế).
+3.5. Mô hình hóa hệ thống bằng ngôn ngữ UML 
+3.5.1. Biểu đồ Use Case (Các tác nhân và chức năng)
+Biểu đồ Use Case mô tả mối quan hệ giữa các tác nhân (Sinh viên, Thủ thư) với các chức năng của hệ thống. Sinh viên thực hiện mượn/trả sách, trong khi Thủ thư thực hiện quản lý danh mục và cấu hình hệ thống AI.
+3.5.2. Biểu đồ Tuần tự (Sequence Diagram) cho quy trình mượn/trả
+Mô tả chi tiết trình tự tương tác giữa các đối tượng trong hệ thống theo thời gian. Từ khi cảm biến NFC nhận tín hiệu, gửi đến bộ xử lý, bộ xử lý yêu cầu Camera chụp ảnh, gửi ảnh qua Module AI, và cuối cùng là cập nhật vào Database.
+3.5.3. Biểu đồ Hoạt động (Activity Diagram)
+Mô tả luồng xử lý của hệ thống từ trạng thái bắt đầu đến kết thúc, bao gồm các nhánh rẽ kiểm tra điều kiện (ví dụ: thẻ hợp lệ/không hợp lệ, sách đã có trong kho/không xác định).
+3.6. Kịch bản kiểm thử và đảm bảo chất lượng (QA Testing)
+Hệ thống được thiết kế các kịch bản kiểm thử thực tế nhằm đảm bảo tính ổn định:
+Kiểm thử chức năng nhận diện: Đánh giá độ chính xác của AI khi tài liệu có màu sắc tương đồng hoặc bị đặt sai hướng (ngược, chéo).
+Kiểm thử hiệu năng (Performance Test): Đo lường và đối chiếu thời gian xử lý giữa giao dịch đơn (1 tài liệu) và giao dịch cụm (5 tài liệu đồng thời).
+Kiểm thử ngoại lệ (Exception Handling): Kiểm tra cơ chế phản hồi khi thẻ NFC phát sinh lỗi kỹ thuật, hoặc thao tác mượn tài liệu đang ở trạng thái đã được mượn bởi người khác.
+3.7
+.
+ Các biểu đồ thiết kế hệ thống UML
+3.7.1 Biểu đồ Use Case tổng quát
+Biểu đồ Use Case tổng quát mô tả bức tranh toàn cảnh về ranh giới hệ thống, các phân hệ chức năng chính và mối quan hệ tương tác giữa các tác nhân bên ngoài (Sinh viên, Thủ thư) với hệ thống. Ngoài ra, biểu đồ còn chỉ rõ các tích hợp dịch vụ bên thứ ba như Cổng thanh toán PayOS (để đóng lệ phí thẻ), Cloudinary (để lưu trữ ảnh hóa đơn đăng ký và bìa sách), và Mail Server (để gửi thông báo tự động).
+3.7.2. Các biểu đồ Use case chi tiết
+a. 
+Biểu đồ Use Case chi tiết đối với tác nhân Sinh viên (Mobile App)
+Đăng ký tài khoản thẻ trực tuyến (bắt buộc hoàn tất thanh toán lệ phí qua PayOS).
+Xác thực đăng nhập: Quét thẻ qua đầu đọc NFC của thiết bị di động, hoặc nhập mã Serial thủ công (fallback cho thiết bị không hỗ trợ NFC).
+Tương tác tài liệu: Tra cứu đầu sách, bình luận, thêm vào mục yêu thích.
+Quản lý giao dịch: Khởi tạo và gửi yêu cầu mượn/trả sách.
+b) Biểu đồ Use Case chi tiết đối với tác nhân Thủ thư (Web Dashboard)
+Quản lý danh mục sách: Thêm/sửa/xóa tài liệu, hỗ trợ tính năng Import hàng loạt qua file CSV/Excel để tự động khởi tạo dữ liệu và phân kệ.
+Quản trị không gian: Cấu hình và định nghĩa các kệ sách vật lý.
+Quản lý người dùng: Hậu kiểm đơn đăng ký, duyệt và thực hiện thao tác quét gán mã thẻ NFC vật lý cho sinh viên.
+Quản lý giao dịch: Phê duyệt các yêu cầu mượn/trả từ hệ thống.
+Theo dõi hệ thống: Trích xuất và giám sát các chỉ số KPIs hoạt động của thư viện.
+3.7.3 Biểu đồ Sequence (Biểu đồ tuần tự)
+Đặc tả thứ tự truyền thông điệp cho nghiệp vụ gửi và duyệt yêu cầu mượn tài liệu.
+Luồng tương tác giữa các thực thể: Sinh viên (Mobile App) -> API Backend (FastAPI) -> Cơ sở dữ liệu (PostgreSQL/MySQL) -> Bộ quản lý kết nối thời gian thực (WebSocket) -> Thủ thư (Web Admin).
+Đảm bảo tính đồng bộ (Transaction): Trạng thái bản sao của sách lập tức chuyển sang "borrowed" (đã mượn) ngay khi thủ thư xác nhận phê duyệt.
+3.7.4 Biểu đồ Active (Biểu đồ hoạt động)
+Đặc tả luồng nghiệp vụ khởi tạo tài khoản:
+Sinh viên nhập thông tin đăng ký trên Mobile App.
+Thực hiện thanh toán lệ phí qua PayOS.
+Hệ thống tiếp nhận phản hồi tự động qua Webhook và chuyển tài khoản sang trạng thái "Chờ duyệt".
+Thủ thư kiểm tra thông tin trên Web Dashboard.
+Thủ thư phê duyệt, quẹt thẻ vật lý để gán định danh và chính thức kích hoạt thẻ.
+      
+3.7.5.
+ 
+Biểu đồ State (Biểu đồ trạng thái)
+Đặc tả chu kỳ chuyển đổi trạng thái của hai thực thể cốt lõi:
+Tài liệu (Book): Quản lý tình trạng lưu kho, đang cho mượn, bảo trì.
+Tài khoản/Thẻ (User): Trạng thái hoạt động, chờ kích hoạt, báo mất.
+Mục đích: Cơ sở để thiết lập các ràng buộc, ngăn chặn các ngoại lệ như mượn trùng tài liệu hoặc giao dịch bằng thẻ đã bị khóa.
+Biểu đồ Communicate (Biểu đồ giao tiếp)
+Tập trung đặc tả kiến trúc tương tác tĩnh trong Chức năng phân kệ hàng loạt cho đầu sách (thông qua endpoint 
+/api/books/assign-by-title
+).
+Các thông điệp được đánh số thứ tự logic: Thao tác của Thủ thư trên UI -> Gọi API Backend -> Truy xuất và cập nhật Database -> Phản hồi kết quả -> Đồng bộ hiển thị UI.
+ 
+CHƯƠNG 4: 
+TRIỂN KHAI VÀ KẾT QUẢ THỰC HIỆN 
+4.1. Giao diện Website (Admin):
+4.1.1. Giao diện tổng quan
+Ở giao diện này, admin sẽ biết được thống kê toàn bộ dự án của mình như: Người dùng, tổng thu nhập hàng tháng, sách đang mượn…
+4.1.2. Giao diện xếp sách & vị trí
+Giao diện xếp sách & vị trí giúp admin có thể quản lý toàn bộ sách trong thư viện, từ đó dễ dàng biết được số lượng sách đang mượn và đã trả.
+Ngoài ra còn có thể nhập thủ công các sách muốn xếp kệ.
+4.1.3. 
+Giao diện 
+Quản lý sách:
+Đây là trang mà admin 
+dùng để 
+xem toàn bộ sách đang có trong 
+thư viện của mình
+Ngoài ra có thể thêm sách 
+thủ công 
+với 
+các 
+trường thông tin: 
+ISBN (mã sách), Tác giả, Thể loại sách,…
+4.1.4. Giao diện Mượn/Trả:
+Giao diện 
+Thư viện online:
+Mô phỏng trực quan không gian thư viện dưới dạng tủ/kệ ảo, giúp người dùng tra cứu và định vị chính xác vị trí vật lý của từng cuốn sách (theo Khu vực, Tủ/Kệ, Hàng).
+Giao diện 
+Duyệt mượn sách
+:
+Tiếp nhận và quản lý các đơn yêu cầu mượn sách từ sinh viên với tốc độ cập nhật theo thời gian thực Real-time.
+Giao diện 
+Duyệt trả sách:
+Phân loại rõ ràng các trạng thái đơn hàng (Chờ duyệt, Đã duyệt), giúp 
+admin
+ xử lý yêu cầu nhanh chóng, chính xác và không bị sót đơn.
+4.1.5. 
+Giao diện Tài khoản & NFC:
+Quản lý sinh viên:
+ 
+Quản lý tập trung danh sách sinh viên đang hoạt động, đồng bộ hóa thông tin cá nhân (Mã SV, Email) trực tiếp với mã định danh vật lý (Địa chỉ MAC) của thẻ NFC/RFID.
+Duyệt đăng ký:
+Số hóa quy trình tiếp nhận yêu cầu tạo tài khoản mới từ sinh viên, cho phép quản trị viên xem xét chi tiết thông tin trước khi cấp quyền.
+Kết quả: Giảm thiểu thao tác thủ công trong khâu đăng ký, giúp hệ thống vận hành trơn tru và kiểm soát tốt dữ liệu đầu vào của người dùng.
+4.2. 
+Giao diện App ( user
+)
+:
+4.2.1. Giao diện trang chủ: 
+Ở trang chủ có
+ 2
+ 
+phân luồng trực tiếp người dùng vào hai thao tác: "Quét thẻ NFC" để truy cập hệ thống và "Đăng ký thẻ" cho sinh viên mới.
+4.2.2. Giao diện đăng ký thẻ SmartLib:
+Chức năng: Cho phép nhập mã sinh viên để tra cứu xem đơn đăng ký đã được quản trị viên duyệt hay chưa trước khi kích hoạt thẻ vật lý.
+Giúp người dùng chủ động kiểm tra trạng thái thẻ của mình, đồng thời phân luồng thẳng những sinh viên mới sang trang điền form đăng ký.
+4.2.3. Giao diện đăng ký tài khoản:
+Giao diện biểu mẫu để người dùng điền các thông tin cá nhân cơ bản (Mã SV/CCCD, Họ tên,...) để đăng ký mượn sách.
+4.2.4. Giao diện thanh toán:
+Người dùng quét mã QR để thanh toán phí đăng ký thẻ, chỉ cần dùng app ngân hàng để quét mã, hệ thống đã tự động điền sẵn số tiền và nội dung chuyển khoản.
+4.2.5. Giao diện đọc thẻ NFC:
+Đây là trang yêu cầu người dùng quét thẻ để đăng nhập vào hệ thống.Sinh viên chỉ cần áp thẻ vật lý SmartLib vào mặt lưng điện thoại để ứng dụng tự động nhận diện qua NFC.
+4.2.6.Giao diện SmartLib Home:
+Đây là trang chủ hiển thị những tựa sách đang hot trong tuần của thư viện. Ngoài ra trang còn có phần châm ngôn mỗi ngày và thanh menu bên dưới để chuyển sang các mục khác.
+4.2.7. Giao diện mượn sách:
+Đây là trang dùng camera điện thoại để quét mã vạch (ISBN) in trên bìa sách. Sau khi quét, app sẽ hiện thông tin sách lên, người dùng bấm "Gửi yêu cầu mượn sách" để gửi đơn lên cho admin duyệt.
+4.2.8. Giao diện Trả sách:
+- Trang trả sách dùng camera để quét mã vạch (ISBN) khi người dùng muốn trả lại sách cho thư viện. Sau khi quét xong, app hiện thông tin sách, người dùng bấm "Gửi yêu cầu trả sách" để báo cho admin biết.
+4.2.9. Giao diện tài khoản:
+Giao diện để sinh viên quản lý tủ sách của mình, xem được số lượng sách đã đọc, đang mượn và danh sách yêu thích. Ngoài ra trang này còn dùng để xem thông tin chi tiết, cài đặt tài khoản hoặc đăng xuất khỏi ứng dụng.
+4.3. Thiết kế giao diện và mô tả trải nghiệm người dùng (UI/UX)
+4.3.1. Các màn hình chức năng trên Mobile App (Sinh viên)
+Ứng dụng di động có thiết kế giao diện hiện đại, bố cục trực quan với tông màu xanh nhạt làm chủ đạo:
+1. Màn hình Chào mừng và Xác thực NFC: Sử dụng hình ảnh động quét NFC trực quan. Sinh viên chỉ cần nhấn 'QUÉT THẺ NFC' và đặt thẻ sinh viên sát mặt sau điện thoại để đăng nhập tức thì dựa trên UID thẻ sinh viên đã liên kết.
+2. Màn hình Đăng ký tài khoản: Biểu mẫu điền thông tin cá nhân (Họ tên, Mã SV, Lớp, Email) và chụp ảnh/tải lên hóa đơn chuyển khoản lệ phí làm thẻ sinh viên trực tuyến nhằm đối chiếu thanh toán PayOS.
+3. Màn hình Chi tiết sách và Gợi ý liên quan: Hiển thị thông tin chi tiết về sách, trạng thái bản sao (còn/hết sách), tóm tắt nội dung và danh sách gợi ý 'Sách liên quan' cuộn ngang do thuật toán AI sinh ra giúp sinh viên dễ dàng khám phá thêm tài liệu.
+4.3.2. Các phân hệ trên Web Admin Dashboard (Thủ thư)
+Giao diện quản lý dành cho thủ thư được phát triển dưới dạng ứng dụng đơn trang (SPA) gồm các phân hệ:
+1. Bảng thống kê Dashboard: Hiển thị trực quan các chỉ số KPI như tổng số đầu sách, số thành viên, sách đang lưu thông và doanh thu qua PayOS kèm biểu đồ thống kê tăng trưởng thư viện.
+2. Phân hệ Quản lý và Nhập kho Sách: Hỗ trợ thêm sách thủ công hoặc nhập tệp CSV/Excel hàng loạt để hệ thống tự động phân loại và xếp vào các kệ sách vật lý còn trống trong thư viện.
+3. Phân hệ Phê duyệt và Gán mã thẻ NFC: Hiển thị danh sách đăng ký làm thẻ của sinh viên. Thủ thư đối chiếu hóa đơn thanh toán và phê duyệt, sau đó quẹt thẻ sinh viên vật lý lên đầu đọc NFC kết nối máy tính để ghi nhận nfc_serial kích hoạt tài khoản sinh viên.
+4.4. Kịch bản kiểm thử chi tiết và Đảm bảo chất lượng (QA Testing)
+Để đảm bảo toàn bộ hệ thống vận hành chính xác tuyệt đối trong mọi tình huống, nhóm thực hiện đã thiết kế và chạy thành công 20 kịch bản kiểm thử tích hợp. Dưới đây là các kịch bản kiểm thử chức năng tiêu biểu đạt trạng thái ĐẠT:
+STT
+Chức năng kiểm thử
+Dữ liệu đầu vào
+Quy trình thực hiện
+Kết quả mong đợi
+Kết quả thực tế
+Trạng thái
+1
+Xác thực đăng nhập bằng NFC
+Thẻ sinh viên có UID: 04:A3:2C:12
+Đặt thẻ NFC gần cảm biến điện thoại khi ứng dụng đang ở màn hình đăng nhập.
+Ứng dụng đọc mã UID, gửi lên API Backend, xác định đúng tài khoản và tự động chuyển trang.
+Đăng nhập thành công sau 0.8 giây.
+ĐẠT
+2
+Đăng nhập bằng thẻ NFC chưa kích hoạt
+Thẻ NFC mới chưa gán UID
+Quét thẻ NFC mới lên điện thoại tại màn hình đăng nhập.
+Hệ thống từ chối đăng nhập và hiển thị thông báo lỗi "Thẻ chưa được kích hoạt trên hệ thống".
+Hiện lỗi cảnh báo chính xác.
+ĐẠT
+3
+Đăng ký tài khoản thẻ trùng mã SV
+Mã sinh viên: 23IT.EB031 (Đã tồn tại trong DB)
+Điền thông tin đăng ký mới với mã sinh viên trùng lặp và nhấn gửi.
+Hệ thống báo lỗi "Mã sinh viên này đã đăng ký thẻ thành viên".
+Hiện thông báo trùng lặp thông tin.
+ĐẠT
+4
+Tạo liên kết thanh toán với PayOS
+Lệ phí làm thẻ: 10,000 VND
+Sinh viên điền thông tin đăng ký hợp lệ và nhấn "Tiến hành đăng ký".
+Backend gọi API PayOS thành công, trả về link thanh toán QR Code và mã đơn hàng.
+Nhận link thanh toán QR thành công.
+ĐẠT
+5
+Đóng lệ phí làm thẻ qua PayOS
+Quét mã QR thanh toán trên ứng dụng Ngân hàng
+Sinh viên tiến hành quét mã QR và xác nhận chuyển khoản trên ứng dụng ngân hàng.
+Giao dịch chuyển khoản thành công, PayOS gửi Webhook xác nhận trạng thái thanh toán là paid.
+Webhook nhận tín hiệu cập nhật trạng thái trong 1.5 giây.
+ĐẠT
+6
+Gán thẻ NFC vật lý cho tài khoản mới
+Thẻ NFC UID: 53:CF:D8:1A, User ID: 12
+Thủ thư mở thông tin hồ sơ của User 12, chọn "Duyệt & Gán thẻ", đặt thẻ lên đầu đọc tại quầy.
+Hệ thống cập nhật trường nfc_serial bằng mã UID tương ứng và chuyển trạng thái User sang active.
+Thẻ được gán đúng và tài khoản hoạt động bình thường.
+ĐẠT
+7
+Đăng ký mượn sách trên Mobile App
+Danh sách ISBN: 9786049221230
+Sinh viên chọn đầu sách, đưa vào giỏ hàng và nhấn gửi yêu cầu mượn.
+Backend tạo yêu cầu mượn ở trạng thái pending và gửi thông báo WebSocket tới Web Admin.
+Tạo yêu cầu thành công, Web Admin nhận tin nhắn thông báo ngay lập tức.
+ĐẠT
+8
+Mượn vượt quá số lượng sách tối đa
+Giỏ mượn chứa 6 cuốn sách
+Sinh viên cố tình thêm 6 cuốn sách vào yêu cầu mượn (giới hạn tối đa là 5 cuốn).
+Ứng dụng di động hiển thị cảnh báo chặn giao dịch: "Bạn chỉ được mượn tối đa 5 cuốn sách cùng lúc".
+Ngăn chặn mượn vượt giới hạn thành công.
+ĐẠT
+9
+Phê duyệt yêu cầu mượn sách
+Đơn mượn ID: 45, trạng thái pending
+Thủ thư chọn yêu cầu mượn trên Web Dashboard và nhấn "Phê duyệt mượn".
+Backend gán mã bản sao sách khả dụng, đổi trạng thái sách sang borrowed, tạo Transaction ongoing.
+Trạng thái sách chuyển sang 'borrowed', tạo đơn mượn thành công.
+ĐẠT
+10
+Trả sách trễ hạn (Stored Procedure)
+Giao dịch ID: 89 (Hạn trả: quá hạn 5 ngày)
+Thủ thư phê duyệt yêu cầu trả sách bị quá hạn 5 ngày.
+Stored procedure tự động tính toán tiền phạt trễ hạn: 5 ngày * 2,000đ = 10,000đ và cập nhật vào giao dịch.
+Phạt tiền 10,000 VND được ghi nhận chính xác trong DB.
+ĐẠT
+11
+Tự động phân kệ sách vật lý
+Đầu sách mới thuộc thể loại Kỹ thuật
+Tiến hành nhập kho đầu sách mới.
+Hệ thống tự động xếp sách vào Zone Kỹ thuật (Zone A), Shelf 2, Level 1 dựa trên dung lượng kệ còn trống.
+Sách được gán đúng tọa độ vị trí kệ.
+ĐẠT
+CHƯƠNG 5: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
+5.1. Tổng kết kết quả đạt được
+Đề tài "Xây dựng hệ thống quản lý thư viện thông minh dựa trên nền tảng AI và NFC" đã hoàn thành các mục tiêu đặt ra:
+1. Về mặt hệ thống và kiến trúc phần mềm: Xây dựng hệ thống tích hợp hoạt động đồng bộ gồm Backend (FastAPI), Mobile App (Flutter) và Web Dashboard (Expo Web) kết nối thời gian thực qua WebSockets.
+2. Về mặt tích hợp công nghệ NFC và thanh toán: Thực hiện định danh sinh viên bằng NFC vật lý tích hợp trên ứng dụng. Tích hợp cổng PayOS giúp tự động hóa thanh toán lệ phí làm thẻ sinh viên trực tuyến, tối giản hóa quy trình phê duyệt của thủ thư.
+5.2. Những hạn chế còn tồn tại
+Mặc dù hệ thống đã vận hành ổn định, đề tài vẫn còn một số điểm hạn chế nhất định cần khắc phục:
+1. Sự phụ thuộc vào kết nối Internet: Do hệ thống liên kết với các API bên thứ ba như PayOS để xử lý hóa đơn và Cloudinary để lưu trữ hình ảnh, hoạt động đăng ký làm thẻ hoặc nhập sách mới sẽ bị ảnh hưởng nếu kết nối mạng của thư viện gặp sự cố.
+2. Giới hạn nền tảng di động của tính năng NFC: Ứng dụng di động mới chỉ kiểm thử toàn diện trên Android. Trên iOS, do chính sách bảo mật CoreNFC và yêu cầu tài khoản nhà phát triển nên chưa được triển khai thực tế.
+5.3. Hướng phát triển trong tương lai
+Nhóm nghiên cứu đề xuất các hướng phát triển trong tương lai nhằm nâng cao trải nghiệm người dùng và tự động hóa quy trình quản lý:
+1. Tích hợp công nghệ thị giác máy tính nhận diện bìa sách trực tiếp: Huấn luyện các mô hình học sâu kết nối với Camera tại quầy mượn trả tự động để phát hiện và phân loại đồng thời nhiều cuốn sách đặt trên bàn quét.
+2. Ứng dụng tủ khóa thông minh tích hợp IoT: Phát triển tủ Locker tự động để sinh viên có thể nhận sách mượn trước đó bằng cách quẹt thẻ sinh viên NFC tại tủ bất kỳ lúc nào ngoài giờ hành chính mà không cần phụ thuộc vào giờ làm việc của thủ thư.
+5.4. Kết luận chung
+Đồ án "Xây dựng hệ thống quản lý thư viện thông minh dựa trên nền tảng AI và NFC" có ý nghĩa khoa học và thực tiễn sâu sắc trong bối cảnh chuyển đổi số giáo dục đại học. Dự án đã cho thấy việc tích hợp công nghệ AI và IoT vào một ứng dụng thực tiễn hoàn toàn khả thi và đem lại hiệu quả vận hành vượt trội so với quản lý thủ công. 
+TÀI LIỆU THAM KHẢO
+1.  Tài liệu Tiếng Việt:
+  [1] Nguyễn Đức Hiển, *Giáo trình Công nghệ Nhận dạng Vô tuyến (RFID & NFC) và Ứng dụng*, Trường Đại học Công nghệ Thông tin và Truyền thông Việt - Hàn, 2022.
+   [2] Huỳnh Công Pháp, *Giáo trình Lập trình Hệ thống mạng và Giao tiếp thiết bị*, Nhà xuất bản Giáo dục Việt Nam, 2021.
+2.  Tài liệu Tiếng Anh:
+   [4] Sebastian Raschka & Vahid Mirjalili, *Python Machine Learning: Machine Learning and Deep Learning with Python, scikit-learn, and TensorFlow*, Packt Publishing, 2020.
+   [5] Martin Fowler, *Patterns of Enterprise Application Architecture*, Addison-Wesley Professional, 2012.
+   [6] Bill Phillips & Kristin Marsicano, *Android Programming: The Big Nerd Ranch Guide (NFC & Hardware Integration)*, Big Nerd Ranch Guides, 2019.
+   [7] FastAPI Documentation, *Interactive API documentation and web frameworks performance*, 2023. URL: https://fastapi.tiangolo.com/
+   [8] Flutter Developer Community, *Developing applications with NFC Capabilities and Camera Integration*, 2023. URL: https://docs.flutter.dev/

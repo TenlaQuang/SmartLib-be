@@ -976,6 +976,8 @@ def update_user(user_id: int, payload: schemas.UserUpdate, db: Session = Depends
     
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
+        if key == "status" and value == "pending_nfc" and user.status != "pending_nfc":
+            user.nfc_tag_id = None
         setattr(user, key, value)
     
     try:
@@ -1019,18 +1021,27 @@ def update_user_secure(user_id: int, payload: schemas.UserUpdateSecure, db: Sess
 
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
-    """Xóa người dùng (Lưu ý: Chỉ nên xóa nếu không có ràng buộc mượn trả)."""
+    """Xóa người dùng hoặc khóa tài khoản, thu hồi thẻ NFC."""
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
     
     try:
+        # Thử xóa cứng trong CSDL
         db.delete(user)
         db.commit()
-        return {"message": "Đã xóa người dùng thành công."}
-    except Exception as e:
+        return {"message": "Đã xóa người dùng và thu hồi thẻ NFC thành công."}
+    except Exception:
+        # Nếu vướng khóa ngoại (do sinh viên đã từng mượn sách), ta không thể xóa cứng
+        # -> Rollback lại và chuyển sang Soft Delete: Khóa tài khoản, gỡ NFC
         db.rollback()
-        raise HTTPException(status_code=500, detail="Không thể xóa người dùng này (có thể do ràng buộc dữ liệu).")
+        user = db.query(models.User).filter(models.User.user_id == user_id).first()
+        if user:
+            user.nfc_tag_id = None  # Giải phóng thẻ NFC cho người khác tái sử dụng
+            user.status = "inactive"  # Khóa tài khoản
+            db.commit()
+            return {"message": "Tài khoản chứa lịch sử mượn trả. Đã khóa tài khoản và giải phóng thẻ NFC thành công."}
+        raise HTTPException(status_code=500, detail="Lỗi khi thu hồi thẻ.")
 
 @app.get("/api/users/check/{user_code}")
 def check_user_for_nfc(user_code: str, db: Session = Depends(get_db)):
